@@ -42,6 +42,7 @@ _output/
 releases/
 
 # Configuration files with secrets
+config.yaml
 *.env
 .env.local
 .env.*.local

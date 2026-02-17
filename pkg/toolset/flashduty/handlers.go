@@ -2,6 +2,9 @@ package flashduty
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // getClient validates and returns the FlashDuty client from the generic client.
@@ -147,6 +150,90 @@ func setOptionalMap(params, body map[string]any, key string) {
 	}
 }
 
+// lastDayRange returns (00:00:00, 23:59:59) of yesterday in local time.
+func lastDayRange() (int64, int64) {
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	start := today.AddDate(0, 0, -1)
+	end := today.Add(-time.Second)
+	return start.Unix(), end.Unix()
+}
+
+// lastWeekRange returns (Monday 00:00:00, Sunday 23:59:59) of the previous week in local time.
+func lastWeekRange() (int64, int64) {
+	now := time.Now()
+	wd := int(now.Weekday())
+	if wd == 0 {
+		wd = 7 // ISO: Sunday = 7
+	}
+	thisMonday := time.Date(now.Year(), now.Month(), now.Day()-wd+1, 0, 0, 0, 0, now.Location())
+	start := thisMonday.AddDate(0, 0, -7)
+	end := thisMonday.Add(-time.Second)
+	return start.Unix(), end.Unix()
+}
+
+// parseTimeRange parses a relative time range string and returns (startTime, endTime) as unix seconds.
+// Supported formats:
+//   - Duration: "1h", "24h", "7d", "30d", "1w", "6M" (end time = now)
+//   - Named:    "last_day" (yesterday 00:00:00 to 23:59:59)
+//               "last_week" (Monday 00:00:00 to Sunday 23:59:59 of previous week)
+func parseTimeRange(tr string) (int64, int64, error) {
+	tr = strings.TrimSpace(tr)
+	if tr == "" {
+		return 0, 0, fmt.Errorf("time_range is empty")
+	}
+
+	// Named ranges
+	switch strings.ToLower(tr) {
+	case "last_day":
+		s, e := lastDayRange()
+		return s, e, nil
+	case "last_week":
+		s, e := lastWeekRange()
+		return s, e, nil
+	}
+
+	// Duration-based ranges
+	unit := tr[len(tr)-1]
+	numStr := tr[:len(tr)-1]
+	n, err := strconv.Atoi(numStr)
+	if err != nil || n <= 0 {
+		return 0, 0, fmt.Errorf("invalid time_range %q: must be a duration (e.g., '24h', '7d') or a named range ('last_day', 'last_week')", tr)
+	}
+	now := time.Now()
+	var dur time.Duration
+	switch unit {
+	case 'h':
+		dur = time.Duration(n) * time.Hour
+	case 'd':
+		dur = time.Duration(n) * 24 * time.Hour
+	case 'w':
+		dur = time.Duration(n) * 7 * 24 * time.Hour
+	case 'M':
+		dur = time.Duration(n) * 30 * 24 * time.Hour
+	default:
+		return 0, 0, fmt.Errorf("invalid time_range unit %q: must be h, d, w, or M", string(unit))
+	}
+	return now.Add(-dur).Unix(), now.Unix(), nil
+}
+
+// resolveTimeParams extracts start/end time from params, supporting both
+// time_range (e.g., "24h") and explicit start_time/end_time unix seconds.
+func resolveTimeParams(params map[string]any) (int64, int64, error) {
+	if tr := getStringParam(params, "time_range"); tr != "" {
+		return parseTimeRange(tr)
+	}
+	startTime, ok := getNumberParam(params, "start_time")
+	if !ok {
+		return 0, 0, fmt.Errorf("either time_range or start_time+end_time is required")
+	}
+	endTime, ok := getNumberParam(params, "end_time")
+	if !ok {
+		return 0, 0, fmt.Errorf("either time_range or start_time+end_time is required")
+	}
+	return int64(startTime), int64(endTime), nil
+}
+
 // buildPaginationParams adds common pagination parameters to the request body.
 func buildPaginationParams(params map[string]any, body map[string]any) {
 	if limit, ok := getIntParam(params, "limit"); ok {
@@ -200,18 +287,14 @@ func handleListIncidents(client any, params map[string]any) (string, error) {
 		return "", err
 	}
 
-	startTime, ok := getNumberParam(params, "start_time")
-	if !ok {
-		return "", fmt.Errorf("start_time is required")
-	}
-	endTime, ok := getNumberParam(params, "end_time")
-	if !ok {
-		return "", fmt.Errorf("end_time is required")
+	startTime, endTime, err := resolveTimeParams(params)
+	if err != nil {
+		return "", err
 	}
 
 	body := map[string]any{
-		"start_time": int64(startTime),
-		"end_time":   int64(endTime),
+		"start_time": startTime,
+		"end_time":   endTime,
 	}
 
 	setOptionalString(params, body, "progress")
@@ -404,18 +487,14 @@ func handleListAlerts(client any, params map[string]any) (string, error) {
 		return "", err
 	}
 
-	startTime, ok := getNumberParam(params, "start_time")
-	if !ok {
-		return "", fmt.Errorf("start_time is required")
-	}
-	endTime, ok := getNumberParam(params, "end_time")
-	if !ok {
-		return "", fmt.Errorf("end_time is required")
+	startTime, endTime, err := resolveTimeParams(params)
+	if err != nil {
+		return "", err
 	}
 
 	body := map[string]any{
-		"start_time": int64(startTime),
-		"end_time":   int64(endTime),
+		"start_time": startTime,
+		"end_time":   endTime,
 	}
 
 	setOptionalString(params, body, "alert_severity")
@@ -559,18 +638,14 @@ func handleGetIncidentStats(client any, params map[string]any) (string, error) {
 		return "", err
 	}
 
-	startTime, ok := getNumberParam(params, "start_time")
-	if !ok {
-		return "", fmt.Errorf("start_time is required")
-	}
-	endTime, ok := getNumberParam(params, "end_time")
-	if !ok {
-		return "", fmt.Errorf("end_time is required")
+	startTime, endTime, err := resolveTimeParams(params)
+	if err != nil {
+		return "", err
 	}
 
 	body := map[string]any{
-		"start_time": int64(startTime),
-		"end_time":   int64(endTime),
+		"start_time": startTime,
+		"end_time":   endTime,
 		"query":      "",
 		"labels":     map[string]any{},
 		"fields":     map[string]any{},

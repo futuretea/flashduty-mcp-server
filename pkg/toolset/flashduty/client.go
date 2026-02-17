@@ -95,9 +95,9 @@ func filterBriefList(jsonData string, briefFields []string) string {
 		return jsonData
 	}
 
-	fieldSet := make(map[string]bool, len(briefFields))
+	fieldSet := make(map[string]struct{}, len(briefFields))
 	for _, f := range briefFields {
-		fieldSet[f] = true
+		fieldSet[f] = struct{}{}
 	}
 
 	filtered := make([]any, 0, len(items))
@@ -108,7 +108,7 @@ func filterBriefList(jsonData string, briefFields []string) string {
 		}
 		brief := make(map[string]any, len(briefFields))
 		for k, v := range obj {
-			if fieldSet[k] {
+			if _, ok := fieldSet[k]; ok {
 				brief[k] = v
 			}
 		}

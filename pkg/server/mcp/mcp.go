@@ -163,16 +163,17 @@ func (s *Server) Close() {
 
 // NewTextResult creates a standardized text result for tool responses.
 func NewTextResult(content string, err error) *mcp.CallToolResult {
-	text := content
-	isError := false
 	if err != nil {
-		text = err.Error()
-		isError = true
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{
+				mcp.TextContent{Type: "text", Text: err.Error()},
+			},
+		}
 	}
 	return &mcp.CallToolResult{
-		IsError: isError,
 		Content: []mcp.Content{
-			mcp.TextContent{Type: "text", Text: text},
+			mcp.TextContent{Type: "text", Text: content},
 		},
 	}
 }
