@@ -315,7 +315,7 @@ func handleListIncidents(client any, params map[string]any) (string, error) {
 	if brief, ok := getBoolParam(params, "brief"); ok && brief {
 		return filterBriefList(result, incidentBriefFields), nil
 	}
-	return result, nil
+	return enrichIncidentList(c, result), nil
 }
 
 // handleGetIncident handles the get_incident tool call.
@@ -334,7 +334,11 @@ func handleGetIncident(client any, params map[string]any) (string, error) {
 		"incident_id": incidentID,
 	}
 
-	return c.DoRequest("/incident/info", body)
+	result, err := c.DoRequest("/incident/info", body)
+	if err != nil {
+		return "", err
+	}
+	return enrichIncidentDetail(c, result), nil
 }
 
 // handleCreateIncident handles the create_incident tool call.
@@ -682,7 +686,11 @@ func handleGetIncidentTimeline(client any, params map[string]any) (string, error
 	setOptionalStringSlice(params, body, "types")
 	buildPaginationParams(params, body)
 
-	return c.DoRequest("/incident/feed", body)
+	result, err := c.DoRequest("/incident/feed", body)
+	if err != nil {
+		return "", err
+	}
+	return enrichTimeline(c, result), nil
 }
 
 // ===== Incident-Alert Association Handler =====
@@ -709,4 +717,176 @@ func handleListIncidentAlerts(client any, params map[string]any) (string, error)
 	buildPaginationParams(params, body)
 
 	return c.DoRequest("/incident/alert/list", body)
+}
+
+// ===== Similar Incidents Handler =====
+
+// handleListSimilarIncidents handles the list_similar_incidents tool call.
+func handleListSimilarIncidents(client any, params map[string]any) (string, error) {
+	c, err := getClient(client)
+	if err != nil {
+		return "", err
+	}
+
+	incidentID := getStringParam(params, "incident_id")
+	if incidentID == "" {
+		return "", fmt.Errorf("incident_id is required")
+	}
+
+	body := map[string]any{
+		"incident_id": incidentID,
+	}
+
+	if limit, ok := getIntParam(params, "limit"); ok {
+		body["limit"] = min(limit, 20)
+	}
+
+	result, err := c.DoRequest("/incident/past/list", body)
+	if err != nil {
+		return "", err
+	}
+	return enrichIncidentList(c, result), nil
+}
+
+// ===== Update Incident Handler =====
+
+// handleUpdateIncident handles the update_incident tool call.
+func handleUpdateIncident(client any, params map[string]any) (string, error) {
+	c, err := getClient(client)
+	if err != nil {
+		return "", err
+	}
+
+	incidentID := getStringParam(params, "incident_id")
+	if incidentID == "" {
+		return "", fmt.Errorf("incident_id is required")
+	}
+
+	body := map[string]any{
+		"incident_id": incidentID,
+	}
+
+	setOptionalString(params, body, "title")
+	setOptionalString(params, body, "description")
+	setOptionalString(params, body, "impact")
+	setOptionalString(params, body, "root_cause")
+	setOptionalString(params, body, "resolution")
+	setOptionalString(params, body, "incident_severity")
+
+	return doAction(c, "/incident/reset", body, "Successfully updated incident")
+}
+
+// ===== Assign Incident Handler =====
+
+// handleAssignIncident handles the assign_incident tool call.
+func handleAssignIncident(client any, params map[string]any) (string, error) {
+	c, err := getClient(client)
+	if err != nil {
+		return "", err
+	}
+
+	incidentIDs := getStringSliceParam(params, "incident_ids")
+	if len(incidentIDs) == 0 {
+		return "", fmt.Errorf("incident_ids is required and must not be empty")
+	}
+
+	assignType := getStringParam(params, "type")
+	if assignType == "" {
+		assignType = "assign"
+	}
+
+	assignedTo := map[string]any{
+		"type": assignType,
+	}
+
+	if personIDs := getIntSliceParam(params, "person_ids"); len(personIDs) > 0 {
+		assignedTo["person_ids"] = personIDs
+	}
+	if escalateRuleID, ok := getIntParam(params, "escalate_rule_id"); ok {
+		assignedTo["escalate_rule_id"] = escalateRuleID
+	}
+
+	body := map[string]any{
+		"incident_ids": incidentIDs,
+		"assigned_to":  assignedTo,
+	}
+
+	return doAction(c, "/incident/assign", body,
+		fmt.Sprintf("Successfully assigned %d incident(s)", len(incidentIDs)))
+}
+
+// ===== Change Handlers =====
+
+// handleQueryChanges handles the query_changes tool call.
+func handleQueryChanges(client any, params map[string]any) (string, error) {
+	c, err := getClient(client)
+	if err != nil {
+		return "", err
+	}
+
+	body := map[string]any{}
+
+	// Time range is optional for changes
+	if tr := getStringParam(params, "time_range"); tr != "" {
+		startTime, endTime, err := parseTimeRange(tr)
+		if err != nil {
+			return "", err
+		}
+		body["start_time"] = startTime
+		body["end_time"] = endTime
+	} else {
+		if startTime, ok := getNumberParam(params, "start_time"); ok {
+			body["start_time"] = int64(startTime)
+		}
+		if endTime, ok := getNumberParam(params, "end_time"); ok {
+			body["end_time"] = int64(endTime)
+		}
+	}
+
+	setOptionalString(params, body, "query")
+	setOptionalIntSlice(params, body, "channel_ids")
+	setOptionalIntSlice(params, body, "integration_ids")
+	setOptionalString(params, body, "order_by")
+	if asc, ok := getBoolParam(params, "asc"); ok {
+		body["asc"] = asc
+	}
+	if includeEvents, ok := getBoolParam(params, "include_events"); ok {
+		body["include_events"] = includeEvents
+	}
+	buildPaginationParams(params, body)
+
+	return c.DoRequest("/change/list", body)
+}
+
+// ===== Escalation Rules Handler =====
+
+// handleQueryEscalationRules handles the query_escalation_rules tool call.
+func handleQueryEscalationRules(client any, params map[string]any) (string, error) {
+	c, err := getClient(client)
+	if err != nil {
+		return "", err
+	}
+
+	channelID, ok := getIntParam(params, "channel_id")
+	if !ok {
+		return "", fmt.Errorf("channel_id is required")
+	}
+
+	body := map[string]any{
+		"channel_id": channelID,
+	}
+
+	return c.DoRequest("/channel/escalate/rule/list", body)
+}
+
+// ===== Custom Fields Handler =====
+
+// handleQueryFields handles the query_fields tool call.
+func handleQueryFields(client any, params map[string]any) (string, error) {
+	c, err := getClient(client)
+	if err != nil {
+		return "", err
+	}
+
+	return c.DoRequest("/field/list", map[string]any{})
 }

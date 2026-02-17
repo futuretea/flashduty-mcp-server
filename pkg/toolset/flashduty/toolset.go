@@ -8,7 +8,7 @@ import (
 
 // Toolset provides FlashDuty incident management tools.
 type Toolset struct {
-	// ReadOnly disables write operations (create, ack, resolve, reopen, snooze, comment, close)
+	// ReadOnly disables write operations (create, ack, resolve, reopen, snooze, comment, close, update, assign)
 	ReadOnly bool
 }
 
@@ -311,6 +311,84 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 			),
 			Handler: handleListSchedules,
 		},
+
+		// ===== Similar Incidents =====
+		{
+			Tool: mcp.NewTool("list_similar_incidents",
+				mcp.WithDescription("Find similar historical incidents for a given incident. Useful for pattern analysis and diagnosis."),
+				mcp.WithString("incident_id",
+					mcp.Required(),
+					mcp.Description("The incident ID to find similar incidents for."),
+				),
+				mcp.WithNumber("limit",
+					mcp.Description("Maximum number of similar incidents to return (max 20)."),
+				),
+			),
+			Handler: handleListSimilarIncidents,
+		},
+
+		// ===== Change Tools =====
+		{
+			Tool: mcp.NewTool("query_changes",
+				mcp.WithDescription("Query deployment/change events from FlashDuty. Useful for correlating incidents with recent deployments. Time range is optional."),
+				mcp.WithString("time_range",
+					mcp.Description("Relative time range: '1h', '24h', '7d', '30d', '1w', '6M', or 'last_day', 'last_week'. Alternative to start_time+end_time."),
+				),
+				mcp.WithNumber("start_time",
+					mcp.Description("Start time in unix seconds."),
+				),
+				mcp.WithNumber("end_time",
+					mcp.Description("End time in unix seconds."),
+				),
+				mcp.WithString("query",
+					mcp.Description("Search keyword to filter changes."),
+				),
+				mcp.WithArray("channel_ids",
+					mcp.Description("Filter by collaboration space IDs."),
+					mcp.Items(itemsInteger),
+				),
+				mcp.WithArray("integration_ids",
+					mcp.Description("Filter by integration IDs."),
+					mcp.Items(itemsInteger),
+				),
+				mcp.WithString("order_by",
+					mcp.Description("Field to order by (e.g., 'start_time')."),
+				),
+				mcp.WithBoolean("asc",
+					mcp.Description("Sort ascending if true, descending if false."),
+				),
+				mcp.WithBoolean("include_events",
+					mcp.Description("Include change events in the response."),
+				),
+				mcp.WithNumber("limit",
+					mcp.Description("Page size (1-100, default 20)."),
+				),
+				mcp.WithNumber("p",
+					mcp.Description("Page number starting from 1."),
+				),
+			),
+			Handler: handleQueryChanges,
+		},
+
+		// ===== Escalation Rules =====
+		{
+			Tool: mcp.NewTool("query_escalation_rules",
+				mcp.WithDescription("Query escalation rules for a collaboration space. Returns the escalation policy configuration."),
+				mcp.WithNumber("channel_id",
+					mcp.Required(),
+					mcp.Description("The collaboration space (channel) ID."),
+				),
+			),
+			Handler: handleQueryEscalationRules,
+		},
+
+		// ===== Custom Fields =====
+		{
+			Tool: mcp.NewTool("query_fields",
+				mcp.WithDescription("Query custom field definitions from FlashDuty. Returns all configured custom fields for incidents."),
+			),
+			Handler: handleQueryFields,
+		},
 	}
 
 	// Write tools - only enabled when not in read-only mode
@@ -421,6 +499,57 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 					),
 				),
 				Handler: handleCloseAlerts,
+			},
+			// ===== Incident Update Tools =====
+			toolset.ServerTool{
+				Tool: mcp.NewTool("update_incident",
+					mcp.WithDescription("Update an incident's details. Can modify title, description, severity, impact, root cause, and resolution. At least one field besides incident_id must be provided."),
+					mcp.WithString("incident_id",
+						mcp.Required(),
+						mcp.Description("The incident ID to update."),
+					),
+					mcp.WithString("title",
+						mcp.Description("New incident title."),
+					),
+					mcp.WithString("description",
+						mcp.Description("New incident description. Supports markdown."),
+					),
+					mcp.WithString("incident_severity",
+						mcp.Description("New severity level. Must be one of: 'Critical', 'Warning', 'Info'."),
+					),
+					mcp.WithString("impact",
+						mcp.Description("Impact description of the incident."),
+					),
+					mcp.WithString("root_cause",
+						mcp.Description("Root cause of the incident."),
+					),
+					mcp.WithString("resolution",
+						mcp.Description("Resolution description of the incident."),
+					),
+				),
+				Handler: handleUpdateIncident,
+			},
+			// ===== Incident Assignment Tools =====
+			toolset.ServerTool{
+				Tool: mcp.NewTool("assign_incident",
+					mcp.WithDescription("Assign one or more incidents to specific persons or an escalation rule."),
+					mcp.WithArray("incident_ids",
+						mcp.Required(),
+						mcp.Description("List of incident IDs to assign."),
+						mcp.Items(itemsString),
+					),
+					mcp.WithString("type",
+						mcp.Description("Assignment type: 'assign' for direct person assignment, 'escalateRule' for escalation rule. Default: 'assign'."),
+					),
+					mcp.WithArray("person_ids",
+						mcp.Description("List of person IDs to assign to (when type is 'assign')."),
+						mcp.Items(itemsInteger),
+					),
+					mcp.WithNumber("escalate_rule_id",
+						mcp.Description("Escalation rule ID to assign to (when type is 'escalateRule')."),
+					),
+				),
+				Handler: handleAssignIncident,
 			},
 		)
 	}
