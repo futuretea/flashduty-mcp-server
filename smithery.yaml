@@ -6,6 +6,8 @@ startCommand:
   commandFunction:
     |-
     (config) => ({
-      "command": "flashduty-mcp-server",
-      "args": []
+      "command": "npx",
+      "args": [
+        "-y", "@futuretea/flashduty-mcp-server@latest"
+      ]
     })

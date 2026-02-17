@@ -15,7 +15,9 @@ builds:
       - amd64
       - arm64
     goos:
+      - darwin
       - linux
+      - windows
     tags:
       - netgo
     flags:

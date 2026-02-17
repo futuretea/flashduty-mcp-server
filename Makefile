@@ -16,17 +16,60 @@ COMMON_BUILD_ARGS = -ldflags "$(LD_FLAGS)"
 GOLANGCI_LINT = $(shell pwd)/_output/tools/bin/golangci-lint
 GOLANGCI_LINT_VERSION ?= v2.2.2
 
+# NPM version should not append the -dirty flag
+NPM_VERSION ?= $(shell echo $(shell git describe --tags --always) | sed 's/^v//')
+OSES = darwin linux windows
+ARCHS = amd64 arm64
+
+CLEAN_TARGETS :=
+CLEAN_TARGETS += '$(BINARY_NAME)'
+CLEAN_TARGETS += $(foreach os,$(OSES),$(foreach arch,$(ARCHS),$(BINARY_NAME)-$(os)-$(arch)$(if $(findstring windows,$(os)),.exe,)))
+CLEAN_TARGETS += $(foreach os,$(OSES),$(foreach arch,$(ARCHS),./npm/$(BINARY_NAME)-$(os)-$(arch)/bin/))
+CLEAN_TARGETS += ./npm/flashduty-mcp-server/.npmrc ./npm/flashduty-mcp-server/LICENSE ./npm/flashduty-mcp-server/README.md
+CLEAN_TARGETS += $(foreach os,$(OSES),$(foreach arch,$(ARCHS),./npm/$(BINARY_NAME)-$(os)-$(arch)/.npmrc))
+
 .PHONY: help
 help: ## Display this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9\/\.-]+:.*?##/ { printf "  \033[36m%-21s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: clean
 clean: ## Clean up all build artifacts
-	rm -rf '$(BINARY_NAME)'
+	rm -rf $(CLEAN_TARGETS)
 
 .PHONY: build
 build: tidy ## Build the project
 	CGO_ENABLED=0 go build $(COMMON_BUILD_ARGS) -o $(BINARY_NAME) ./cmd/flashduty-mcp-server
+
+.PHONY: build-all-platforms
+build-all-platforms: tidy ## Build the project for all platforms
+	$(foreach os,$(OSES),$(foreach arch,$(ARCHS), \
+		GOOS=$(os) GOARCH=$(arch) go build $(COMMON_BUILD_ARGS) -o $(BINARY_NAME)-$(os)-$(arch)$(if $(findstring windows,$(os)),.exe,) ./cmd/flashduty-mcp-server; \
+	))
+
+.PHONY: npm-copy-binaries
+npm-copy-binaries: build-all-platforms ## Copy the binaries to each npm package
+	$(foreach os,$(OSES),$(foreach arch,$(ARCHS), \
+		EXECUTABLE=./$(BINARY_NAME)-$(os)-$(arch)$(if $(findstring windows,$(os)),.exe,); \
+		DIRNAME=$(BINARY_NAME)-$(os)-$(arch); \
+		mkdir -p ./npm/$$DIRNAME/bin; \
+		cp $$EXECUTABLE ./npm/$$DIRNAME/bin/; \
+	))
+
+.PHONY: npm-publish
+npm-publish: npm-copy-binaries ## Publish the npm packages
+	$(foreach os,$(OSES),$(foreach arch,$(ARCHS), \
+		DIRNAME="$(BINARY_NAME)-$(os)-$(arch)"; \
+		cd npm/$$DIRNAME; \
+		echo '//registry.npmjs.org/:_authToken=$(NPM_TOKEN)' >> .npmrc; \
+		jq '.version = "$(NPM_VERSION)"' package.json > tmp.json && mv tmp.json package.json; \
+		npm publish --access=public; \
+		cd ../..; \
+	))
+	cp README.md LICENSE ./npm/flashduty-mcp-server/
+	echo '//registry.npmjs.org/:_authToken=$(NPM_TOKEN)' >> ./npm/flashduty-mcp-server/.npmrc
+	jq '.version = "$(NPM_VERSION)"' ./npm/flashduty-mcp-server/package.json > tmp.json && mv tmp.json ./npm/flashduty-mcp-server/package.json; \
+	jq '.optionalDependencies |= with_entries(.value = "$(NPM_VERSION)")' ./npm/flashduty-mcp-server/package.json > tmp.json && mv tmp.json ./npm/flashduty-mcp-server/package.json; \
+	cd npm/flashduty-mcp-server && npm publish --access=public
 
 .PHONY: test
 test: ## Run the tests

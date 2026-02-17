@@ -2,6 +2,7 @@
 
 [![Build](https://github.com/futuretea/flashduty-mcp-server/actions/workflows/build.yaml/badge.svg)](https://github.com/futuretea/flashduty-mcp-server/actions/workflows/build.yaml)
 [![GitHub License](https://img.shields.io/github/license/futuretea/flashduty-mcp-server)](https://github.com/futuretea/flashduty-mcp-server/blob/main/LICENSE)
+[![npm](https://img.shields.io/npm/v/@futuretea/flashduty-mcp-server)](https://www.npmjs.com/package/@futuretea/flashduty-mcp-server)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/futuretea/flashduty-mcp-server?sort=semver)](https://github.com/futuretea/flashduty-mcp-server/releases/latest)
 
 [Features](#features) | [Getting Started](#getting-started) | [Configuration](#configuration) | [Tools](#tools) | [Development](#development)
@@ -22,7 +23,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for [F
 - **Advanced Filtering**: Filter by channel, responder, acknowledger, creator, labels, severity, and more
 - **Security Controls**: `read_only` mode to disable all write operations
 - **Dual Transport**: Stdio mode for MCP client integration or HTTP/SSE mode for network access
-- **Cross-platform**: Native binaries for Linux (amd64/arm64), macOS (amd64/arm64), and Docker images
+- **Cross-platform**: Native binaries for Linux, macOS, Windows (amd64/arm64), npm package, and Docker images
 
 ## Getting Started <a id="getting-started"></a>
 
@@ -33,8 +34,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for [F
 ### Claude Code
 
 ```shell
-claude mcp add flashduty -- \
-  /path/to/flashduty-mcp-server \
+claude mcp add flashduty -- npx @futuretea/flashduty-mcp-server@latest \
   --app-key YOUR_APP_KEY
 ```
 
@@ -46,8 +46,10 @@ Add to `.vscode/mcp.json` or `~/.cursor/mcp.json`:
 {
   "servers": {
     "flashduty": {
-      "command": "/path/to/flashduty-mcp-server",
+      "command": "npx",
       "args": [
+        "-y",
+        "@futuretea/flashduty-mcp-server@latest",
         "--app-key",
         "YOUR_APP_KEY"
       ]
@@ -85,7 +87,7 @@ Configuration can be set via CLI flags, environment variables, or a config file.
 ### CLI Options
 
 ```shell
-flashduty-mcp-server --help
+npx @futuretea/flashduty-mcp-server@latest --help
 ```
 
 | Option | Description | Default |
@@ -455,7 +457,7 @@ make lint
 ### Run with mcp-inspector
 
 ```shell
-npx @modelcontextprotocol/inspector@latest $(pwd)/flashduty-mcp-server
+npx @modelcontextprotocol/inspector@latest -- npx @futuretea/flashduty-mcp-server@latest
 ```
 
 ## Contributing

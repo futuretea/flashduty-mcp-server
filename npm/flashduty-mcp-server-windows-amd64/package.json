@@ -1,0 +1,11 @@
+{
+  "name": "@futuretea/flashduty-mcp-server-windows-amd64",
+  "version": "0.0.0",
+  "description": "FlashDuty MCP Server binary for windows/amd64",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ]
+}

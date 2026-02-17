@@ -1,0 +1,40 @@
+{
+  "name": "@futuretea/flashduty-mcp-server",
+  "version": "0.0.0",
+  "description": "Model Context Protocol (MCP) server for FlashDuty incident management",
+  "main": "./bin/index.js",
+  "bin": {
+    "flashduty-mcp-server": "bin/index.js"
+  },
+  "optionalDependencies": {
+    "@futuretea/flashduty-mcp-server-darwin-amd64": "0.0.0",
+    "@futuretea/flashduty-mcp-server-darwin-arm64": "0.0.0",
+    "@futuretea/flashduty-mcp-server-linux-amd64": "0.0.0",
+    "@futuretea/flashduty-mcp-server-linux-arm64": "0.0.0",
+    "@futuretea/flashduty-mcp-server-windows-amd64": "0.0.0",
+    "@futuretea/flashduty-mcp-server-windows-arm64": "0.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/futuretea/flashduty-mcp-server.git"
+  },
+  "keywords": [
+    "mcp",
+    "flashduty",
+    "incident",
+    "alert",
+    "model context protocol",
+    "model",
+    "context",
+    "protocol"
+  ],
+  "author": {
+    "name": "futuretea",
+    "url": "https://github.com/futuretea"
+  },
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/futuretea/flashduty-mcp-server/issues"
+  },
+  "homepage": "https://github.com/futuretea/flashduty-mcp-server#readme"
+}
