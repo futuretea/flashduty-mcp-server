@@ -34,7 +34,7 @@ type StaticConfig struct {
 	DisabledTools []string `mapstructure:"disabled_tools"`
 }
 
-// Validate validates the configuration
+// Validate checks that required fields are present and values are within allowed ranges.
 func (c *StaticConfig) Validate() error {
 	// Validate port
 	if c.Port < 0 || c.Port > 65535 {

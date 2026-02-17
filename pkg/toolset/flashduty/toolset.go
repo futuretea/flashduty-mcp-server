@@ -29,7 +29,7 @@ func (t *Toolset) GetDescription() string {
 	return "FlashDuty incident management and alert tools"
 }
 
-// GetTools returns all FlashDuty tools.
+// GetTools builds the tool list, omitting write tools when ReadOnly is set.
 func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 	tools := []toolset.ServerTool{
 		// ===== Incident Tools =====

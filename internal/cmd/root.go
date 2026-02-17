@@ -52,12 +52,12 @@ func NewMCPServer(streams IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "flashduty-mcp-server",
 		Short: "FlashDuty MCP Server - Model Context Protocol server for FlashDuty incident management",
-		Long: `FlashDuty MCP Server is a Model Context Protocol (MCP) server that provides
-FlashDuty incident management capabilities through the MCP protocol.
+		Long: `FlashDuty MCP Server exposes FlashDuty incident management over the
+Model Context Protocol (MCP).
 
-This server can run in stdio mode for integration with MCP clients or in HTTP mode
-for network access. It supports managing incidents, alerts, channels, teams, members,
-and on-call schedules via the FlashDuty API.`,
+Run in stdio mode for direct MCP client integration, or in HTTP/SSE mode for
+network access. Manage incidents, alerts, channels, teams, members, and
+on-call schedules through the FlashDuty API.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {

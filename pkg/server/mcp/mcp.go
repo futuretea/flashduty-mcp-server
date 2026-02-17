@@ -16,7 +16,7 @@ import (
 	flashdutyToolset "github.com/futuretea/flashduty-mcp-server/pkg/toolset/flashduty"
 )
 
-// Configuration wraps the static configuration with additional runtime components
+// Configuration holds the server's static settings.
 type Configuration struct {
 	*config.StaticConfig
 }

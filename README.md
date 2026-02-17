@@ -16,11 +16,11 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for [F
 - **Collaboration Spaces**: List and inspect channels (collaboration spaces)
 - **Team & Member Lookup**: List teams and members
 - **On-call Schedules**: Query on-call schedules by team
-- **Incident Statistics**: Aggregated MTTA, MTTR, counts, ack rate, and noise reduction metrics
+- **Incident Statistics**: MTTA, MTTR, counts, ack rate, and noise reduction metrics
 - **Incident Timeline**: View event feed (comments, acks, resolves, escalations, notifications)
-- **Incident-Alert Association**: List alerts associated with a specific incident
+- **Incident-Alert Association**: See which alerts belong to a given incident
 - **Brief Mode**: Reduce response size for LLM token limits by returning only key fields
-- **Advanced Filtering**: Filter by channel, responder, acknowledger, creator, labels, severity, and more
+- **Advanced Filtering**: Filter by channel, responder, acknowledger, creator, labels, and severity
 - **Security Controls**: `read_only` mode to disable all write operations
 - **Dual Transport**: Stdio mode for MCP client integration or HTTP/SSE mode for network access
 - **Cross-platform**: Native binaries for Linux, macOS, Windows (amd64/arm64), npm package, and Docker images
