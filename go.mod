@@ -5,7 +5,7 @@ go 1.24.1
 require (
 	github.com/futuretea/go-http-client v0.0.2
 	github.com/mark3labs/mcp-go v0.41.1
-	github.com/rs/zerolog v1.33.0
+	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.18.0
 )
