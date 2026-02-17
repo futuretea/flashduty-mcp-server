@@ -34,6 +34,9 @@ app_key: your-app-key-here
 # FlashDuty API base URL (default: https://api.flashcat.cloud)
 # base_url: https://api.flashcat.cloud
 
+# Security configuration
+read_only: false  # Set to true to disable write operations (create, ack, resolve, reopen, snooze, comment, close)
+
 # Tool enable/disable configuration
 enabled_tools: []  # Enable specific tools (empty means all enabled)
 disabled_tools: []  # Disable specific tools

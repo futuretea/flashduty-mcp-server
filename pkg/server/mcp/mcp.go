@@ -60,7 +60,9 @@ func NewServer(configuration Configuration) (*Server, error) {
 // registerTools registers all available tools based on configuration
 func (s *Server) registerTools() error {
 	// Initialize toolsets
-	fdTs := &flashdutyToolset.Toolset{}
+	fdTs := &flashdutyToolset.Toolset{
+		ReadOnly: s.configuration.ReadOnly,
+	}
 
 	// Get tools from the toolset
 	tools := fdTs.GetTools(s.client)

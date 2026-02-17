@@ -33,6 +33,8 @@ func bindFlags(cmd *cobra.Command) {
 		// FlashDuty API configuration
 		"app_key":  "app-key",
 		"base_url": "base-url",
+		// Security configuration
+		"read_only": "read-only",
 		// Tool configuration
 		"enabled_tools":  "enabled-tools",
 		"disabled_tools": "disabled-tools",
@@ -82,6 +84,9 @@ and on-call schedules via the FlashDuty API.`,
 	// FlashDuty API configuration flags
 	cmd.Flags().String("app-key", "", "FlashDuty API app key")
 	cmd.Flags().String("base-url", config.DefaultBaseURL, "FlashDuty API base URL")
+
+	// Security configuration flags
+	cmd.Flags().Bool("read-only", false, "Run in read-only mode (disables write operations)")
 
 	// Tool configuration flags
 	cmd.Flags().StringSlice("enabled-tools", []string{}, "Comma-separated list of tools to enable")

@@ -20,6 +20,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for [F
 - **Incident-Alert Association**: List alerts associated with a specific incident
 - **Brief Mode**: Reduce response size for LLM token limits by returning only key fields
 - **Advanced Filtering**: Filter by channel, responder, acknowledger, creator, labels, severity, and more
+- **Security Controls**: `read_only` mode to disable all write operations
 - **Dual Transport**: Stdio mode for MCP client integration or HTTP/SSE mode for network access
 - **Cross-platform**: Native binaries for Linux (amd64/arm64), macOS (amd64/arm64), and Docker images
 
@@ -57,9 +58,18 @@ Add to `.vscode/mcp.json` or `~/.cursor/mcp.json`:
 
 ### Docker
 
+Stdio mode:
+
 ```shell
 docker run --rm -i ghcr.io/futuretea/flashduty-mcp-server:latest \
   --app-key YOUR_APP_KEY
+```
+
+HTTP/SSE mode:
+
+```shell
+docker run --rm -p 8080:8080 ghcr.io/futuretea/flashduty-mcp-server:latest \
+  --port 8080 --app-key YOUR_APP_KEY
 ```
 
 ## Configuration <a id="configuration"></a>
@@ -86,6 +96,7 @@ flashduty-mcp-server --help
 | `--log-level` | Log level (0-9) | `5` |
 | `--app-key` | FlashDuty API app key (**required**) | |
 | `--base-url` | FlashDuty API base URL | `https://api.flashcat.cloud` |
+| `--read-only` | Disable write operations | `false` |
 | `--enabled-tools` | Specific tools to enable | |
 | `--disabled-tools` | Specific tools to disable | |
 
@@ -104,6 +115,8 @@ app_key: your-app-key-here
 
 # base_url: https://api.flashcat.cloud
 
+read_only: false  # Set to true to disable write operations
+
 # enabled_tools: []
 # disabled_tools: []
 ```
@@ -115,6 +128,7 @@ Use `FLASHDUTY_MCP_` prefix with underscores:
 ```shell
 FLASHDUTY_MCP_PORT=8080
 FLASHDUTY_MCP_APP_KEY=your-key
+FLASHDUTY_MCP_READ_ONLY=false
 FLASHDUTY_MCP_LOG_LEVEL=5
 ```
 
@@ -143,6 +157,8 @@ flashduty-mcp-server --port 8080 \
 ## Tools <a id="tools"></a>
 
 Use `--enabled-tools` / `--disabled-tools` for fine-grained control.
+
+Use `--read-only` to disable all write operations (create, acknowledge, resolve, reopen, snooze, comment, close).
 
 ### Incident Tools
 
@@ -183,7 +199,7 @@ Get detailed information about a specific incident.
 <details>
 <summary>create_incident</summary>
 
-Create a new incident in FlashDuty.
+Create a new incident in FlashDuty. Disabled when `read_only=true`.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -197,7 +213,7 @@ Create a new incident in FlashDuty.
 <details>
 <summary>ack_incidents</summary>
 
-Acknowledge (claim) one or more incidents.
+Acknowledge (claim) one or more incidents. Disabled when `read_only=true`.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -208,7 +224,7 @@ Acknowledge (claim) one or more incidents.
 <details>
 <summary>resolve_incidents</summary>
 
-Resolve (close) one or more incidents.
+Resolve (close) one or more incidents. Disabled when `read_only=true`.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -221,7 +237,7 @@ Resolve (close) one or more incidents.
 <details>
 <summary>reopen_incidents</summary>
 
-Reopen one or more previously resolved incidents.
+Reopen one or more previously resolved incidents. Disabled when `read_only=true`.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -233,7 +249,7 @@ Reopen one or more previously resolved incidents.
 <details>
 <summary>snooze_incidents</summary>
 
-Snooze (temporarily mute) one or more incidents.
+Snooze (temporarily mute) one or more incidents. Disabled when `read_only=true`.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -245,7 +261,7 @@ Snooze (temporarily mute) one or more incidents.
 <details>
 <summary>comment_incidents</summary>
 
-Add a comment to one or more incidents.
+Add a comment to one or more incidents. Disabled when `read_only=true`.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -290,7 +306,7 @@ Get detailed information about a specific alert.
 <details>
 <summary>close_alerts</summary>
 
-Close one or more alerts.
+Close one or more alerts. Disabled when `read_only=true`.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|

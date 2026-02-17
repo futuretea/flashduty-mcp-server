@@ -26,6 +26,9 @@ type StaticConfig struct {
 	AppKey  string `mapstructure:"app_key"`
 	BaseURL string `mapstructure:"base_url"`
 
+	// Security configuration
+	ReadOnly bool `mapstructure:"read_only"`
+
 	// Tool configuration
 	EnabledTools  []string `mapstructure:"enabled_tools"`
 	DisabledTools []string `mapstructure:"disabled_tools"`

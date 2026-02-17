@@ -7,7 +7,10 @@ import (
 )
 
 // Toolset provides FlashDuty incident management tools.
-type Toolset struct{}
+type Toolset struct {
+	// ReadOnly disables write operations (create, ack, resolve, reopen, snooze, comment, close)
+	ReadOnly bool
+}
 
 var (
 	// itemsInteger is the JSON schema for an array of integers.
@@ -28,7 +31,7 @@ func (t *Toolset) GetDescription() string {
 
 // GetTools returns all FlashDuty tools.
 func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
-	return []toolset.ServerTool{
+	tools := []toolset.ServerTool{
 		// ===== Incident Tools =====
 		{
 			Tool: mcp.NewTool("list_incidents",
@@ -92,99 +95,6 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 			),
 			Handler: handleGetIncident,
 		},
-		{
-			Tool: mcp.NewTool("create_incident",
-				mcp.WithDescription("Create a new incident in FlashDuty."),
-				mcp.WithString("title",
-					mcp.Required(),
-					mcp.Description("Incident title."),
-				),
-				mcp.WithString("incident_severity",
-					mcp.Required(),
-					mcp.Description("Severity level. Must be one of: 'Critical', 'Warning', 'Info'."),
-				),
-				mcp.WithString("description",
-					mcp.Description("Incident description. Can be plain text or markdown."),
-				),
-				mcp.WithNumber("channel_id",
-					mcp.Description("Collaboration space ID to associate the incident with."),
-				),
-			),
-			Handler: handleCreateIncident,
-		},
-		{
-			Tool: mcp.NewTool("ack_incidents",
-				mcp.WithDescription("Acknowledge (claim) one or more incidents."),
-				mcp.WithArray("incident_ids",
-					mcp.Required(),
-					mcp.Description("List of incident IDs to acknowledge."),
-					mcp.Items(itemsString),
-				),
-			),
-			Handler: handleAckIncidents,
-		},
-		{
-			Tool: mcp.NewTool("resolve_incidents",
-				mcp.WithDescription("Resolve (close) one or more incidents. Optionally provide root cause and resolution."),
-				mcp.WithArray("incident_ids",
-					mcp.Required(),
-					mcp.Description("List of incident IDs to resolve."),
-					mcp.Items(itemsString),
-				),
-				mcp.WithString("root_cause",
-					mcp.Description("Root cause of the incident."),
-				),
-				mcp.WithString("resolution",
-					mcp.Description("How the incident was resolved."),
-				),
-			),
-			Handler: handleResolveIncidents,
-		},
-		{
-			Tool: mcp.NewTool("reopen_incidents",
-				mcp.WithDescription("Reopen one or more previously resolved incidents."),
-				mcp.WithArray("incident_ids",
-					mcp.Required(),
-					mcp.Description("List of incident IDs to reopen."),
-					mcp.Items(itemsString),
-				),
-				mcp.WithString("reason",
-					mcp.Required(),
-					mcp.Description("Reason for reopening the incident."),
-				),
-			),
-			Handler: handleReopenIncidents,
-		},
-		{
-			Tool: mcp.NewTool("snooze_incidents",
-				mcp.WithDescription("Snooze (temporarily mute) one or more incidents for a specified number of minutes."),
-				mcp.WithArray("incident_ids",
-					mcp.Required(),
-					mcp.Description("List of incident IDs to snooze."),
-					mcp.Items(itemsString),
-				),
-				mcp.WithNumber("minutes",
-					mcp.Required(),
-					mcp.Description("Number of minutes to snooze (1-1440)."),
-				),
-			),
-			Handler: handleSnoozeIncidents,
-		},
-		{
-			Tool: mcp.NewTool("comment_incidents",
-				mcp.WithDescription("Add a comment to one or more incidents."),
-				mcp.WithArray("incident_ids",
-					mcp.Required(),
-					mcp.Description("List of incident IDs to comment on."),
-					mcp.Items(itemsString),
-				),
-				mcp.WithString("comment",
-					mcp.Required(),
-					mcp.Description("Comment content (1-500 characters)."),
-				),
-			),
-			Handler: handleCommentIncidents,
-		},
 
 		// ===== Alert Tools =====
 		{
@@ -237,18 +147,7 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 			),
 			Handler: handleGetAlert,
 		},
-		{
-			Tool: mcp.NewTool("close_alerts",
-				mcp.WithDescription("Close one or more alerts."),
-				mcp.WithArray("alert_ids",
-					mcp.Required(),
-					mcp.Description("List of alert IDs to close."),
-					mcp.Items(itemsString),
-				),
-			),
-			Handler: handleCloseAlerts,
-		},
-
+		
 		// ===== Channel (Collaboration Space) Tools =====
 		{
 			Tool: mcp.NewTool("list_channels",
@@ -413,4 +312,118 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 			Handler: handleListSchedules,
 		},
 	}
+
+	// Write tools - only enabled when not in read-only mode
+	if !t.ReadOnly {
+		tools = append(tools,
+			// ===== Incident Write Tools =====
+			toolset.ServerTool{
+				Tool: mcp.NewTool("create_incident",
+					mcp.WithDescription("Create a new incident in FlashDuty."),
+					mcp.WithString("title",
+						mcp.Required(),
+						mcp.Description("Incident title."),
+					),
+					mcp.WithString("incident_severity",
+						mcp.Required(),
+						mcp.Description("Severity level. Must be one of: 'Critical', 'Warning', 'Info'."),
+					),
+					mcp.WithString("description",
+						mcp.Description("Incident description. Can be plain text or markdown."),
+					),
+					mcp.WithNumber("channel_id",
+						mcp.Description("Collaboration space ID to associate the incident with."),
+					),
+				),
+				Handler: handleCreateIncident,
+			},
+			toolset.ServerTool{
+				Tool: mcp.NewTool("ack_incidents",
+					mcp.WithDescription("Acknowledge (claim) one or more incidents."),
+					mcp.WithArray("incident_ids",
+						mcp.Required(),
+						mcp.Description("List of incident IDs to acknowledge."),
+						mcp.Items(itemsString),
+					),
+				),
+				Handler: handleAckIncidents,
+			},
+			toolset.ServerTool{
+				Tool: mcp.NewTool("resolve_incidents",
+					mcp.WithDescription("Resolve (close) one or more incidents. Optionally provide root cause and resolution."),
+					mcp.WithArray("incident_ids",
+						mcp.Required(),
+						mcp.Description("List of incident IDs to resolve."),
+						mcp.Items(itemsString),
+					),
+					mcp.WithString("root_cause",
+						mcp.Description("Root cause of the incident."),
+					),
+					mcp.WithString("resolution",
+						mcp.Description("How the incident was resolved."),
+					),
+				),
+				Handler: handleResolveIncidents,
+			},
+			toolset.ServerTool{
+				Tool: mcp.NewTool("reopen_incidents",
+					mcp.WithDescription("Reopen one or more previously resolved incidents."),
+					mcp.WithArray("incident_ids",
+						mcp.Required(),
+						mcp.Description("List of incident IDs to reopen."),
+						mcp.Items(itemsString),
+					),
+					mcp.WithString("reason",
+						mcp.Required(),
+						mcp.Description("Reason for reopening the incident."),
+					),
+				),
+				Handler: handleReopenIncidents,
+			},
+			toolset.ServerTool{
+				Tool: mcp.NewTool("snooze_incidents",
+					mcp.WithDescription("Snooze (temporarily mute) one or more incidents for a specified number of minutes."),
+					mcp.WithArray("incident_ids",
+						mcp.Required(),
+						mcp.Description("List of incident IDs to snooze."),
+						mcp.Items(itemsString),
+					),
+					mcp.WithNumber("minutes",
+						mcp.Required(),
+						mcp.Description("Number of minutes to snooze (1-1440)."),
+					),
+				),
+				Handler: handleSnoozeIncidents,
+			},
+			toolset.ServerTool{
+				Tool: mcp.NewTool("comment_incidents",
+					mcp.WithDescription("Add a comment to one or more incidents."),
+					mcp.WithArray("incident_ids",
+						mcp.Required(),
+						mcp.Description("List of incident IDs to comment on."),
+						mcp.Items(itemsString),
+					),
+					mcp.WithString("comment",
+						mcp.Required(),
+						mcp.Description("Comment content (1-500 characters)."),
+					),
+				),
+				Handler: handleCommentIncidents,
+			},
+			// ===== Alert Write Tools =====
+			toolset.ServerTool{
+				Tool: mcp.NewTool("close_alerts",
+					mcp.WithDescription("Close one or more alerts."),
+					mcp.WithArray("alert_ids",
+						mcp.Required(),
+						mcp.Description("List of alert IDs to close."),
+						mcp.Items(itemsString),
+					),
+				),
+				Handler: handleCloseAlerts,
+			},
+		)
+	}
+
+	return tools
 }
