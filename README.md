@@ -171,8 +171,9 @@ List incidents from FlashDuty. Use `brief=true` to reduce response size (recomme
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `start_time` | number | Yes | Search interval start time in unix seconds. |
-| `end_time` | number | Yes | Search interval end time in unix seconds. |
+| `time_range` | string | No | Relative time range: `1h`, `24h`, `7d`, `30d`, `1w`, `6M`, or `last_day`, `last_week`. Alternative to `start_time`+`end_time`. |
+| `start_time` | number | Conditional | Search interval start time in unix seconds. Required if `time_range` is not set. |
+| `end_time` | number | Conditional | Search interval end time in unix seconds. Required if `time_range` is not set. |
 | `brief` | boolean | No | If true, return only key fields to reduce data volume. |
 | `progress` | string | No | Filter by progress: `Triggered`, `Processing`, `Closed`, or comma-separated. |
 | `incident_severity` | string | No | Filter by severity: `Critical`, `Warning`, `Info`, or comma-separated. |
@@ -272,6 +273,37 @@ Add a comment to one or more incidents. Disabled when `read_only=true`.
 
 </details>
 
+<details>
+<summary>update_incident</summary>
+
+Update an incident's details. At least one field besides `incident_id` must be provided. Disabled when `read_only=true`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `incident_id` | string | Yes | The incident ID to update. |
+| `title` | string | No | New incident title. |
+| `description` | string | No | New incident description. Supports markdown. |
+| `incident_severity` | string | No | New severity: `Critical`, `Warning`, or `Info`. |
+| `impact` | string | No | Impact description of the incident. |
+| `root_cause` | string | No | Root cause of the incident. |
+| `resolution` | string | No | Resolution description of the incident. |
+
+</details>
+
+<details>
+<summary>assign_incident</summary>
+
+Assign one or more incidents to specific persons or an escalation rule. Disabled when `read_only=true`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `incident_ids` | string[] | Yes | List of incident IDs to assign. |
+| `type` | string | No | Assignment type: `assign` (direct) or `escalateRule`. Default: `assign`. |
+| `person_ids` | integer[] | No | List of person IDs to assign to (when type is `assign`). |
+| `escalate_rule_id` | number | No | Escalation rule ID (when type is `escalateRule`). |
+
+</details>
+
 ### Alert Tools
 
 <details>
@@ -281,8 +313,9 @@ List alerts from FlashDuty. Use `brief=true` to reduce response size.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `start_time` | number | Yes | Search interval start time in unix seconds. |
-| `end_time` | number | Yes | Search interval end time in unix seconds. |
+| `time_range` | string | No | Relative time range: `1h`, `24h`, `7d`, `30d`, `1w`, `6M`, or `last_day`, `last_week`. Alternative to `start_time`+`end_time`. |
+| `start_time` | number | Conditional | Search interval start time in unix seconds. Required if `time_range` is not set. |
+| `end_time` | number | Conditional | Search interval end time in unix seconds. Required if `time_range` is not set. |
 | `brief` | boolean | No | If true, return only key fields to reduce data volume. |
 | `alert_severity` | string | No | Filter by severity: `Critical`, `Warning`, `Info`, or comma-separated. |
 | `title` | string | No | Filter by title. Supports exact, regex, and wildcards. |
@@ -395,8 +428,9 @@ Get aggregated incident statistics (MTTA, MTTR, counts, ack rate, noise reductio
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `start_time` | number | Yes | Start time in unix seconds. |
-| `end_time` | number | Yes | End time in unix seconds (max span 6 months). |
+| `time_range` | string | No | Relative time range: `1h`, `24h`, `7d`, `30d`, `1w`, `6M`, or `last_day`, `last_week`. Alternative to `start_time`+`end_time`. |
+| `start_time` | number | Conditional | Start time in unix seconds. Required if `time_range` is not set. |
+| `end_time` | number | Conditional | End time in unix seconds (max span 6 months). Required if `time_range` is not set. |
 | `channel_ids` | integer[] | No | Filter by collaboration space IDs. |
 | `team_ids` | integer[] | No | Filter by team IDs. |
 | `severities` | string[] | No | Filter by severities: `Critical`, `Warning`, `Info`. |
@@ -431,6 +465,65 @@ List alerts associated with a specific incident.
 | `is_active` | boolean | No | Filter by active status. |
 | `limit` | number | No | Page size (max 1000, default 1000). |
 | `p` | number | No | Page number starting from 1. |
+
+</details>
+
+### Similar Incidents Tools
+
+<details>
+<summary>list_similar_incidents</summary>
+
+Find similar historical incidents for a given incident. Useful for pattern analysis and diagnosis.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `incident_id` | string | Yes | The incident ID to find similar incidents for. |
+| `limit` | number | No | Maximum number of similar incidents to return (max 20). |
+
+</details>
+
+### Change Tools
+
+<details>
+<summary>query_changes</summary>
+
+Query deployment/change events from FlashDuty. Useful for correlating incidents with recent deployments.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `time_range` | string | No | Relative time range: `1h`, `24h`, `7d`, `30d`, `1w`, `6M`, or `last_day`, `last_week`. Alternative to `start_time`+`end_time`. |
+| `start_time` | number | No | Start time in unix seconds. |
+| `end_time` | number | No | End time in unix seconds. |
+| `query` | string | No | Search keyword to filter changes. |
+| `channel_ids` | integer[] | No | Filter by collaboration space IDs. |
+| `integration_ids` | integer[] | No | Filter by integration IDs. |
+| `order_by` | string | No | Field to order by (e.g., `start_time`). |
+| `asc` | boolean | No | Sort ascending if true, descending if false. |
+| `include_events` | boolean | No | Include change events in the response. |
+| `limit` | number | No | Page size (1-100, default 20). |
+| `p` | number | No | Page number starting from 1. |
+
+</details>
+
+### Escalation Tools
+
+<details>
+<summary>query_escalation_rules</summary>
+
+Query escalation rules for a collaboration space. Returns the escalation policy configuration.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `channel_id` | number | Yes | The collaboration space (channel) ID. |
+
+</details>
+
+### Custom Field Tools
+
+<details>
+<summary>query_fields</summary>
+
+Query custom field definitions from FlashDuty. Returns all configured custom fields for incidents. No parameters required.
 
 </details>
 

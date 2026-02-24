@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+
+	"github.com/futuretea/flashduty-mcp-server/pkg/core/logging"
 )
 
 // enrichIncidentList enriches a list of incidents with person and channel names.
@@ -77,7 +79,10 @@ func enrichTimeline(c *Client, jsonData string) string {
 		return jsonData
 	}
 
-	personNames, _ := c.FetchPersonInfos(intSetToSlice(personIDs))
+	personNames, err := c.FetchPersonInfos(intSetToSlice(personIDs))
+	if err != nil {
+		logging.Warn("Failed to fetch person infos for timeline enrichment: %v", err)
+	}
 	if personNames == nil {
 		return jsonData
 	}
@@ -104,7 +109,11 @@ func fetchNamesConcurrently(c *Client, personIDSet map[int]struct{}, channelIDSe
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			personNames, _ = c.FetchPersonInfos(intSetToSlice(personIDSet))
+			var err error
+			personNames, err = c.FetchPersonInfos(intSetToSlice(personIDSet))
+			if err != nil {
+				logging.Warn("Failed to fetch person infos for enrichment: %v", err)
+			}
 		}()
 	}
 
@@ -112,7 +121,11 @@ func fetchNamesConcurrently(c *Client, personIDSet map[int]struct{}, channelIDSe
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			channelNames, _ = c.FetchChannelInfos(intSetToSlice(channelIDSet))
+			var err error
+			channelNames, err = c.FetchChannelInfos(intSetToSlice(channelIDSet))
+			if err != nil {
+				logging.Warn("Failed to fetch channel infos for enrichment: %v", err)
+			}
 		}()
 	}
 

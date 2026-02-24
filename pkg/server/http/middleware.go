@@ -46,8 +46,7 @@ func (lrw *loggingResponseWriter) WriteHeader(code int) {
 
 func (lrw *loggingResponseWriter) Write(b []byte) (int, error) {
 	if !lrw.headerWritten {
-		lrw.statusCode = http.StatusOK
-		lrw.headerWritten = true
+		lrw.WriteHeader(http.StatusOK)
 	}
 	return lrw.ResponseWriter.Write(b)
 }

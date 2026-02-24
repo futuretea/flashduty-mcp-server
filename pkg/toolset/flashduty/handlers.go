@@ -176,7 +176,7 @@ func lastWeekRange() (int64, int64) {
 // Supported formats:
 //   - Duration: "1h", "24h", "7d", "30d", "1w", "6M" (end time = now)
 //   - Named:    "last_day" (yesterday 00:00:00 to 23:59:59)
-//               "last_week" (Monday 00:00:00 to Sunday 23:59:59 of previous week)
+//     "last_week" (Monday 00:00:00 to Sunday 23:59:59 of previous week)
 func parseTimeRange(tr string) (int64, int64, error) {
 	tr = strings.TrimSpace(tr)
 	if tr == "" {
@@ -652,7 +652,6 @@ func handleGetIncidentStats(client any, params map[string]any) (string, error) {
 		"end_time":   endTime,
 		"query":      "",
 		"labels":     map[string]any{},
-		"fields":     map[string]any{},
 	}
 
 	setOptionalIntSlice(params, body, "channel_ids")
@@ -773,6 +772,10 @@ func handleUpdateIncident(client any, params map[string]any) (string, error) {
 	setOptionalString(params, body, "resolution")
 	setOptionalString(params, body, "incident_severity")
 
+	if len(body) == 1 {
+		return "", fmt.Errorf("at least one field besides incident_id must be provided")
+	}
+
 	return doAction(c, "/incident/reset", body, "Successfully updated incident")
 }
 
@@ -882,7 +885,7 @@ func handleQueryEscalationRules(client any, params map[string]any) (string, erro
 // ===== Custom Fields Handler =====
 
 // handleQueryFields handles the query_fields tool call.
-func handleQueryFields(client any, params map[string]any) (string, error) {
+func handleQueryFields(client any, _ map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
 		return "", err

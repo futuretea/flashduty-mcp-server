@@ -13,7 +13,15 @@ RUN go mod download
 COPY . .
 
 # Build the binary
-RUN CGO_ENABLED=0 go build -o flashduty-mcp-server ./cmd/flashduty-mcp-server
+ARG VERSION=dev
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+RUN CGO_ENABLED=0 go build \
+    -ldflags="-s -w \
+      -X 'github.com/futuretea/flashduty-mcp-server/pkg/core/version.Version=${VERSION}' \
+      -X 'github.com/futuretea/flashduty-mcp-server/pkg/core/version.GitCommit=${GIT_COMMIT}' \
+      -X 'github.com/futuretea/flashduty-mcp-server/pkg/core/version.BuildDate=${BUILD_DATE}'" \
+    -o flashduty-mcp-server ./cmd/flashduty-mcp-server
 
 # Final stage
 FROM cgr.dev/chainguard/wolfi-base:latest AS runtime

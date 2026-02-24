@@ -2,12 +2,19 @@
 startCommand:
   type: stdio
   configSchema:
-    {}
+    type: object
+    required:
+      - app_key
+    properties:
+      app_key:
+        type: string
+        description: "FlashDuty API app key (from FlashDuty Console -> Personal Settings -> API Keys)"
   commandFunction:
     |-
     (config) => ({
       "command": "npx",
       "args": [
-        "-y", "@futuretea/flashduty-mcp-server@latest"
+        "-y", "@futuretea/flashduty-mcp-server@latest",
+        "--app-key", config.app_key
       ]
     })
