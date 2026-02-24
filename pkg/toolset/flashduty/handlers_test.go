@@ -1,5 +1,4 @@
 package flashduty
-package flashduty
 
 import (
 	"testing"
@@ -12,9 +11,9 @@ func TestParseTimeRange_ValidDurations(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
-		name     string
-		input    string
-		wantDur  time.Duration
+		name      string
+		input     string
+		wantDur   time.Duration
 		tolerance time.Duration
 	}{
 		{"1 hour", "1h", 1 * time.Hour, 2 * time.Second},
