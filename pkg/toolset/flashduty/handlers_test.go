@@ -444,6 +444,59 @@ func TestBuildPaginationParams(t *testing.T) {
 	})
 }
 
+// ===== resolveTimeParams ISO 8601 Tests =====
+
+func TestResolveTimeParams_ISO8601(t *testing.T) {
+	params := map[string]any{
+		"start_time": "2026-03-16T00:00:00+08:00",
+		"end_time":   "2026-03-22T23:59:59+08:00",
+	}
+	startTime, endTime, err := resolveTimeParams(params)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// 2026-03-16 00:00:00 +08:00 => Unix 1773590400
+	wantStart := int64(1773590400)
+	// 2026-03-22 23:59:59 +08:00 => Unix 1774195199
+	wantEnd := int64(1774195199)
+	if startTime != wantStart {
+		t.Errorf("start_time: got %d, want %d", startTime, wantStart)
+	}
+	if endTime != wantEnd {
+		t.Errorf("end_time: got %d, want %d", endTime, wantEnd)
+	}
+}
+
+func TestResolveTimeParams_MixedTypes(t *testing.T) {
+	params := map[string]any{
+		"start_time": float64(1773590400),
+		"end_time":   "2026-03-22T23:59:59+08:00",
+	}
+	startTime, endTime, err := resolveTimeParams(params)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	wantStart := int64(1773590400)
+	wantEnd := int64(1774195199)
+	if startTime != wantStart {
+		t.Errorf("start_time: got %d, want %d", startTime, wantStart)
+	}
+	if endTime != wantEnd {
+		t.Errorf("end_time: got %d, want %d", endTime, wantEnd)
+	}
+}
+
+func TestResolveTimeParams_InvalidISO8601(t *testing.T) {
+	params := map[string]any{
+		"start_time": "not-a-date",
+		"end_time":   "2026-03-22T23:59:59+08:00",
+	}
+	_, _, err := resolveTimeParams(params)
+	if err == nil {
+		t.Error("expected error for invalid start_time, got nil")
+	}
+}
+
 // ===== Helper =====
 
 func abs(n int64) int64 {

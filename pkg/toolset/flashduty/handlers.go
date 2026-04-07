@@ -1,6 +1,7 @@
 package flashduty
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -191,57 +192,87 @@ func parseTimeRange(tr string) (int64, int64, error) {
 	}
 
 	// Named ranges
-	switch strings.ToLower(tr) {
-	case "last_day":
-		s, e := lastDayRange()
-		return s, e, nil
-	case "last_week":
-		s, e := lastWeekRange()
-		return s, e, nil
-	case "week_before_last":
-		s, e := weekBeforeLastRange()
-		return s, e, nil
+	if start, end, ok := parseNamedTimeRange(tr); ok {
+		return start, end, nil
 	}
 
 	// Duration-based ranges
+	return parseDurationTimeRange(tr)
+}
+
+// parseNamedTimeRange handles named time ranges like "last_day", "last_week".
+func parseNamedTimeRange(tr string) (int64, int64, bool) {
+	switch strings.ToLower(tr) {
+	case "last_day":
+		s, e := lastDayRange()
+		return s, e, true
+	case "last_week":
+		s, e := lastWeekRange()
+		return s, e, true
+	case "week_before_last":
+		s, e := weekBeforeLastRange()
+		return s, e, true
+	}
+	return 0, 0, false
+}
+
+// parseDurationTimeRange handles duration-based ranges like "24h", "7d".
+func parseDurationTimeRange(tr string) (int64, int64, error) {
 	unit := tr[len(tr)-1]
 	numStr := tr[:len(tr)-1]
 	n, err := strconv.Atoi(numStr)
 	if err != nil || n <= 0 {
 		return 0, 0, fmt.Errorf("invalid time_range %q: must be a duration (e.g., '24h', '7d') or a named range ('last_day', 'last_week', 'week_before_last')", tr)
 	}
-	now := time.Now()
-	var dur time.Duration
-	switch unit {
-	case 'h':
-		dur = time.Duration(n) * time.Hour
-	case 'd':
-		dur = time.Duration(n) * 24 * time.Hour
-	case 'w':
-		dur = time.Duration(n) * 7 * 24 * time.Hour
-	case 'M':
-		dur = time.Duration(n) * 30 * 24 * time.Hour
-	default:
-		return 0, 0, fmt.Errorf("invalid time_range unit %q: must be h, d, w, or M", string(unit))
+
+	dur, err := durationFromUnit(n, unit)
+	if err != nil {
+		return 0, 0, err
 	}
+
+	now := time.Now()
 	return now.Add(-dur).Unix(), now.Unix(), nil
 }
 
+// durationFromUnit converts a numeric value and unit character to a time.Duration.
+func durationFromUnit(n int, unit byte) (time.Duration, error) {
+	switch unit {
+	case 'h':
+		return time.Duration(n) * time.Hour, nil
+	case 'd':
+		return time.Duration(n) * 24 * time.Hour, nil
+	case 'w':
+		return time.Duration(n) * 7 * 24 * time.Hour, nil
+	case 'M':
+		return time.Duration(n) * 30 * 24 * time.Hour, nil
+	default:
+		return 0, fmt.Errorf("invalid time_range unit %q: must be h, d, w, or M", string(unit))
+	}
+}
+
 // resolveTimeParams extracts start/end time from params, supporting both
-// time_range (e.g., "24h") and explicit start_time/end_time unix seconds.
+// time_range (e.g., "24h") and explicit start_time/end_time (unix seconds or ISO 8601 string).
 func resolveTimeParams(params map[string]any) (int64, int64, error) {
 	if tr := getStringParam(params, "time_range"); tr != "" {
 		return parseTimeRange(tr)
 	}
-	startTime, ok := getNumberParam(params, "start_time")
-	if !ok {
+	sv, hasStart := params["start_time"]
+	if !hasStart {
 		return 0, 0, fmt.Errorf("either time_range or start_time+end_time is required")
 	}
-	endTime, ok := getNumberParam(params, "end_time")
-	if !ok {
+	startTime, err := ParseFlexibleTime(sv)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid start_time: %w", err)
+	}
+	ev, hasEnd := params["end_time"]
+	if !hasEnd {
 		return 0, 0, fmt.Errorf("either time_range or start_time+end_time is required")
 	}
-	return int64(startTime), int64(endTime), nil
+	endTime, err := ParseFlexibleTime(ev)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid end_time: %w", err)
+	}
+	return startTime, endTime, nil
 }
 
 // buildPaginationParams adds common pagination parameters to the request body.
@@ -274,6 +305,32 @@ func doQueryList(c *Client, path string, params map[string]any) (string, error) 
 	}
 	buildPaginationParams(params, body)
 	return c.DoRequest(path, body)
+}
+
+// getClientLocation safely extracts the Location from a client, returning time.UTC on failure.
+func getClientLocation(client any) *time.Location {
+	if c, ok := client.(*Client); ok && c != nil && c.Location != nil {
+		return c.Location
+	}
+	return time.UTC
+}
+
+// injectTimestampDisplayToJSON parses jsonStr, injects _display fields for timestamps,
+// and re-serializes. Falls back to the original string on any error.
+func injectTimestampDisplayToJSON(jsonStr string, loc *time.Location) string {
+	var data map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+		return jsonStr
+	}
+	if items, ok := data["items"].([]interface{}); ok {
+		AddTimestampDisplayToList(items, loc)
+	}
+	AddTimestampDisplay(data, loc)
+	out, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return jsonStr
+	}
+	return string(out)
 }
 
 // ===== Incident Handlers =====
@@ -322,7 +379,7 @@ func handleListIncidents(client any, params map[string]any) (string, error) {
 	}
 
 	if brief, ok := getBoolParam(params, "brief"); ok && brief {
-		return filterBriefList(result, incidentBriefFields), nil
+		return injectTimestampDisplayToJSON(filterBriefList(result, incidentBriefFields), c.Location), nil
 	}
 	return enrichIncidentList(c, result), nil
 }
@@ -517,9 +574,9 @@ func handleListAlerts(client any, params map[string]any) (string, error) {
 	}
 
 	if brief, ok := getBoolParam(params, "brief"); ok && brief {
-		return filterBriefList(result, alertBriefFields), nil
+		return injectTimestampDisplayToJSON(filterBriefList(result, alertBriefFields), c.Location), nil
 	}
-	return result, nil
+	return injectTimestampDisplayToJSON(result, c.Location), nil
 }
 
 func handleGetAlert(client any, params map[string]any) (string, error) {
@@ -537,7 +594,11 @@ func handleGetAlert(client any, params map[string]any) (string, error) {
 		"alert_id": alertID,
 	}
 
-	return c.DoRequest("/alert/info", body)
+	result, err := c.DoRequest("/alert/info", body)
+	if err != nil {
+		return "", err
+	}
+	return injectTimestampDisplayToJSON(result, c.Location), nil
 }
 
 func handleCloseAlerts(client any, params map[string]any) (string, error) {
@@ -654,7 +715,28 @@ func handleGetIncidentStats(client any, params map[string]any) (string, error) {
 	setOptionalString(params, body, "query")
 	setOptionalMap(params, body, "labels")
 
-	return c.DoRequest("/insight/account", body)
+	raw, err := c.DoRequest("/insight/account", body)
+	if err != nil {
+		return "", err
+	}
+
+	// Inject time_range_display and timestamp display fields into response.
+	loc := getClientLocation(client)
+	var result map[string]interface{}
+	if jsonErr := json.Unmarshal([]byte(raw), &result); jsonErr != nil {
+		// Fallback: return raw response if JSON parsing fails.
+		return raw, nil
+	}
+	AddTimestampDisplay(result, loc)
+	result["time_range_display"] = map[string]interface{}{
+		"start": FormatTimestamp(startTime, loc),
+		"end":   FormatTimestamp(endTime, loc),
+	}
+	out, marshalErr := json.MarshalIndent(result, "", "  ")
+	if marshalErr != nil {
+		return raw, nil
+	}
+	return string(out), nil
 }
 
 // ===== Incident Timeline Handler =====
@@ -681,7 +763,8 @@ func handleGetIncidentTimeline(client any, params map[string]any) (string, error
 	if err != nil {
 		return "", err
 	}
-	return enrichTimeline(c, result), nil
+	enriched := enrichTimeline(c, result)
+	return injectTimestampDisplayToJSON(enriched, c.Location), nil
 }
 
 // ===== Incident-Alert Association Handler =====
@@ -706,7 +789,11 @@ func handleListIncidentAlerts(client any, params map[string]any) (string, error)
 	}
 	buildPaginationParams(params, body)
 
-	return c.DoRequest("/incident/alert/list", body)
+	result, err := c.DoRequest("/incident/alert/list", body)
+	if err != nil {
+		return "", err
+	}
+	return injectTimestampDisplayToJSON(result, c.Location), nil
 }
 
 // ===== Similar Incidents Handler =====
@@ -877,4 +964,60 @@ func handleQueryFields(client any, _ map[string]any) (string, error) {
 	}
 
 	return c.DoRequest("/field/list", map[string]any{})
+}
+
+// ===== Aggregate Incidents Handler =====
+
+func handleAggregateIncidents(client any, params map[string]any) (string, error) {
+	c, err := getClient(client)
+	if err != nil {
+		return "", err
+	}
+
+	startTime, endTime, err := resolveTimeParams(params)
+	if err != nil {
+		return "", err
+	}
+
+	req := &AggregateRequest{
+		StartTime: startTime,
+		EndTime:   endTime,
+	}
+
+	// group_by is required.
+	req.GroupBy = getStringSliceParam(params, "group_by")
+	if len(req.GroupBy) == 0 {
+		return "", fmt.Errorf("group_by is required and must not be empty")
+	}
+
+	// channel_id and channel_name are mutually exclusive optional filters.
+	if channelID, ok := getIntParam(params, "channel_id"); ok && channelID != 0 {
+		req.ChannelID = channelID
+	} else if channelName := getStringParam(params, "channel_name"); channelName != "" {
+		req.ChannelName = channelName
+		resolvedID, resolveErr := resolveChannelIDByName(c, channelName)
+		if resolveErr != nil {
+			return "", resolveErr
+		}
+		req.ChannelID = resolvedID
+	}
+
+	req.Severities = getStringSliceParam(params, "severities")
+	req.Query = getStringParam(params, "query")
+
+	if includeDetails, ok := getBoolParam(params, "include_details"); ok {
+		req.IncludeDetails = includeDetails
+	}
+	req.DetailFields = getStringSliceParam(params, "detail_fields")
+
+	if maxIncidents, ok := getIntParam(params, "max_incidents"); ok && maxIncidents > 0 {
+		req.MaxIncidents = maxIncidents
+	}
+
+	result, err := AggregateIncidents(c, req)
+	if err != nil {
+		return "", err
+	}
+
+	return marshalOrFallback(result, "{}"), nil
 }

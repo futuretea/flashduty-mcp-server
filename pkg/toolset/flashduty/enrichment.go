@@ -32,6 +32,7 @@ func enrichIncidentList(c *Client, jsonData string) string {
 	for _, item := range items {
 		if obj, ok := item.(map[string]any); ok {
 			injectIncidentNames(obj, personNames, channelNames)
+			AddTimestampDisplay(obj, c.Location)
 		}
 	}
 
@@ -51,6 +52,7 @@ func enrichIncidentDetail(c *Client, jsonData string) string {
 
 	personNames, channelNames := fetchNamesConcurrently(c, personIDs, channelIDs)
 	injectIncidentNames(data, personNames, channelNames)
+	AddTimestampDisplay(data, c.Location)
 
 	return marshalOrFallback(data, jsonData)
 }

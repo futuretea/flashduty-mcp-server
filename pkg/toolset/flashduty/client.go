@@ -12,10 +12,15 @@ import (
 // Client is an HTTP client for the FlashDuty API.
 type Client struct {
 	httpClient httpclient.Client
+	Location   *time.Location
 }
 
 // NewClient creates a new FlashDuty API client.
-func NewClient(baseURL, appKey string) *Client {
+func NewClient(baseURL, appKey, timezone string) *Client {
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		loc = time.UTC
+	}
 	c := httpclient.NewClient(
 		&httpclient.Config{
 			BaseURL: baseURL,
@@ -29,7 +34,7 @@ func NewClient(baseURL, appKey string) *Client {
 			return nil
 		}),
 	)
-	return &Client{httpClient: c}
+	return &Client{httpClient: c, Location: loc}
 }
 
 // apiResponse represents the standard FlashDuty API response envelope.
@@ -106,38 +111,17 @@ func (c *Client) DoRequestRaw(path string, body map[string]any) (map[string]any,
 
 // FetchPersonInfos fetches person names by IDs. Returns map[personID]personName.
 func (c *Client) FetchPersonInfos(personIDs []int) (map[int]string, error) {
-	if len(personIDs) == 0 {
-		return nil, nil
-	}
-	data, err := c.DoRequestRaw("/person/infos", map[string]any{"person_ids": personIDs})
-	if err != nil {
-		return nil, err
-	}
-	return extractIntNameMap(data, "items", "person_id", "person_name"), nil
+	return c.fetchIntIDNames("/person/infos", "person_ids", personIDs, "person_id", "person_name")
 }
 
 // FetchChannelInfos fetches channel names by IDs. Returns map[channelID]channelName.
 func (c *Client) FetchChannelInfos(channelIDs []int) (map[int]string, error) {
-	if len(channelIDs) == 0 {
-		return nil, nil
-	}
-	data, err := c.DoRequestRaw("/channel/infos", map[string]any{"channel_ids": channelIDs})
-	if err != nil {
-		return nil, err
-	}
-	return extractIntNameMap(data, "items", "channel_id", "channel_name"), nil
+	return c.fetchIntIDNames("/channel/infos", "channel_ids", channelIDs, "channel_id", "channel_name")
 }
 
 // FetchTeamInfos fetches team names by IDs. Returns map[teamID]teamName.
 func (c *Client) FetchTeamInfos(teamIDs []int) (map[int]string, error) {
-	if len(teamIDs) == 0 {
-		return nil, nil
-	}
-	data, err := c.DoRequestRaw("/team/infos", map[string]any{"team_ids": teamIDs})
-	if err != nil {
-		return nil, err
-	}
-	return extractIntNameMap(data, "items", "team_id", "team_name"), nil
+	return c.fetchIntIDNames("/team/infos", "team_ids", teamIDs, "team_id", "team_name")
 }
 
 // FetchScheduleInfos fetches schedule names by IDs. Returns map[scheduleID]scheduleName.
@@ -150,6 +134,18 @@ func (c *Client) FetchScheduleInfos(scheduleIDs []string) (map[string]string, er
 		return nil, err
 	}
 	return extractStringNameMap(data, "items", "schedule_id", "schedule_name"), nil
+}
+
+// fetchIntIDNames is a generic helper to fetch name mappings by integer IDs.
+func (c *Client) fetchIntIDNames(path, idParam string, ids []int, idField, nameField string) (map[int]string, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	data, err := c.DoRequestRaw(path, map[string]any{idParam: ids})
+	if err != nil {
+		return nil, err
+	}
+	return extractIntNameMap(data, "items", idField, nameField), nil
 }
 
 // extractIntNameMap extracts a map[int]string from a list of objects in data[listKey].

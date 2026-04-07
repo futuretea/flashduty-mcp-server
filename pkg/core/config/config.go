@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -32,6 +33,9 @@ type StaticConfig struct {
 	// Tool configuration
 	EnabledTools  []string `mapstructure:"enabled_tools"`
 	DisabledTools []string `mapstructure:"disabled_tools"`
+
+	// Timezone configuration
+	DefaultTimezone string `mapstructure:"default_timezone"`
 }
 
 // Validate checks that required fields are present and values are within allowed ranges.
@@ -51,6 +55,11 @@ func (c *StaticConfig) Validate() error {
 		return fmt.Errorf("app_key is required")
 	}
 
+	// Validate timezone
+	if _, err := time.LoadLocation(c.DefaultTimezone); err != nil {
+		return fmt.Errorf("invalid default_timezone %q: %w", c.DefaultTimezone, err)
+	}
+
 	return nil
 }
 
@@ -62,6 +71,7 @@ func LoadConfig(configPath string) (*StaticConfig, error) {
 
 	// Set defaults
 	v.SetDefault("base_url", DefaultBaseURL)
+	v.SetDefault("default_timezone", "Asia/Shanghai")
 
 	// Set configuration file if provided
 	if configPath != "" {

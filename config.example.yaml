@@ -40,3 +40,6 @@ read_only: false  # Set to true to disable write operations (create, ack, resolv
 # Tool enable/disable configuration
 enabled_tools: []  # Enable specific tools (empty means all enabled)
 disabled_tools: []  # Disable specific tools
+
+# Timezone for display timestamps (default: Asia/Shanghai)
+# default_timezone: Asia/Shanghai

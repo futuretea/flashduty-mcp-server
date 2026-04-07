@@ -40,7 +40,7 @@ func NewServer(configuration Configuration) (*Server, error) {
 	)
 
 	// Initialize FlashDuty client
-	client := flashdutyToolset.NewClient(configuration.BaseURL, configuration.AppKey)
+	client := flashdutyToolset.NewClient(configuration.BaseURL, configuration.AppKey, configuration.DefaultTimezone)
 	logging.Info("FlashDuty client initialized (base_url: %s)", configuration.BaseURL)
 
 	s := &Server{
