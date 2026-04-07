@@ -13,18 +13,14 @@ type Toolset struct {
 }
 
 var (
-	// itemsInteger is the JSON schema for an array of integers.
 	itemsInteger = map[string]any{"type": "integer"}
-	// itemsString is the JSON schema for an array of strings.
-	itemsString = map[string]any{"type": "string"}
+	itemsString  = map[string]any{"type": "string"}
 )
 
-// GetName returns the name of the toolset.
 func (t *Toolset) GetName() string {
 	return "flashduty"
 }
 
-// GetDescription returns the description of the toolset.
 func (t *Toolset) GetDescription() string {
 	return "FlashDuty incident management and alert tools"
 }
@@ -37,7 +33,7 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 			Tool: mcp.NewTool("list_incidents",
 				mcp.WithDescription("List incidents from FlashDuty. Specify time_range (e.g., '24h', '7d') or start_time+end_time (unix seconds). Use brief=true to reduce response size (recommended for initial queries)."),
 				mcp.WithString("time_range",
-					mcp.Description("Relative time range: duration '1h', '24h', '7d', '30d', '1w', '6M', or named range 'last_day', 'last_week'. Alternative to start_time+end_time."),
+					mcp.Description("Relative time range: duration '1h', '24h', '7d', '30d', '1w', '6M', or named range 'last_day', 'last_week', 'week_before_last'. Alternative to start_time+end_time."),
 				),
 				mcp.WithNumber("start_time",
 					mcp.Description("Search interval start time in unix seconds. Required if time_range is not set."),
@@ -101,7 +97,7 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 			Tool: mcp.NewTool("list_alerts",
 				mcp.WithDescription("List alerts from FlashDuty. Specify time_range (e.g., '24h', '7d') or start_time+end_time (unix seconds). Use brief=true to reduce response size."),
 				mcp.WithString("time_range",
-					mcp.Description("Relative time range: duration '1h', '24h', '7d', '30d', '1w', '6M', or named range 'last_day', 'last_week'. Alternative to start_time+end_time."),
+					mcp.Description("Relative time range: duration '1h', '24h', '7d', '30d', '1w', '6M', or named range 'last_day', 'last_week', 'week_before_last'. Alternative to start_time+end_time."),
 				),
 				mcp.WithNumber("start_time",
 					mcp.Description("Search interval start time in unix seconds. Required if time_range is not set."),
@@ -214,7 +210,7 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 			Tool: mcp.NewTool("get_incident_stats",
 				mcp.WithDescription("Get aggregated incident statistics from FlashDuty. Returns counts, MTTA, MTTR, ack rate, noise reduction, etc. Specify time_range (e.g., '7d', '30d') or start_time+end_time (unix seconds). Use aggregate_unit to break down by time period."),
 				mcp.WithString("time_range",
-					mcp.Description("Relative time range: duration '1h', '24h', '7d', '30d', '1w', '6M', or named range 'last_day', 'last_week'. Alternative to start_time+end_time."),
+					mcp.Description("Relative time range: duration '1h', '24h', '7d', '30d', '1w', '6M', or named range 'last_day', 'last_week', 'week_before_last'. Alternative to start_time+end_time."),
 				),
 				mcp.WithNumber("start_time",
 					mcp.Description("Start time in unix seconds. Required if time_range is not set."),
@@ -332,7 +328,7 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 			Tool: mcp.NewTool("query_changes",
 				mcp.WithDescription("Query deployment/change events from FlashDuty. Useful for correlating incidents with recent deployments. Time range is optional."),
 				mcp.WithString("time_range",
-					mcp.Description("Relative time range: '1h', '24h', '7d', '30d', '1w', '6M', or 'last_day', 'last_week'. Alternative to start_time+end_time."),
+					mcp.Description("Relative time range: '1h', '24h', '7d', '30d', '1w', '6M', or 'last_day', 'last_week', 'week_before_last'. Alternative to start_time+end_time."),
 				),
 				mcp.WithNumber("start_time",
 					mcp.Description("Start time in unix seconds."),

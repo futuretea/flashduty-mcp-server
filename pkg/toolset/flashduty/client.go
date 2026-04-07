@@ -55,16 +55,25 @@ func parseResponse(resp *apiResponse) (string, error) {
 	return "OK", nil
 }
 
-// DoRequest sends a POST request to the FlashDuty API and returns the formatted JSON data.
-func (c *Client) DoRequest(path string, body map[string]any) (string, error) {
+// doPost sends a POST request and returns the parsed apiResponse.
+func (c *Client) doPost(path string, body map[string]any) (*apiResponse, error) {
 	if body == nil {
 		body = map[string]any{}
 	}
 	var resp apiResponse
 	if err := c.httpClient.POST(path).WithJSON(body).Do(&resp); err != nil {
-		return "", fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	return parseResponse(&resp)
+	return &resp, nil
+}
+
+// DoRequest sends a POST request to the FlashDuty API and returns the formatted JSON data.
+func (c *Client) DoRequest(path string, body map[string]any) (string, error) {
+	resp, err := c.doPost(path, body)
+	if err != nil {
+		return "", err
+	}
+	return parseResponse(resp)
 }
 
 // DoGet sends a GET request to the FlashDuty API and returns the formatted JSON data.
@@ -78,12 +87,9 @@ func (c *Client) DoGet(path string) (string, error) {
 
 // DoRequestRaw sends a POST request and returns the parsed data as a map.
 func (c *Client) DoRequestRaw(path string, body map[string]any) (map[string]any, error) {
-	if body == nil {
-		body = map[string]any{}
-	}
-	var resp apiResponse
-	if err := c.httpClient.POST(path).WithJSON(body).Do(&resp); err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+	resp, err := c.doPost(path, body)
+	if err != nil {
+		return nil, err
 	}
 	if resp.Error != nil && resp.Error.Code != "" {
 		return nil, fmt.Errorf("API error [%s]: %s", resp.Error.Code, resp.Error.Message)

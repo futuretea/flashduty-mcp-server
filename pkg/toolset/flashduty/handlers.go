@@ -16,7 +16,6 @@ func getClient(client any) (*Client, error) {
 	return c, nil
 }
 
-// getStringParam extracts a string parameter from the map.
 func getStringParam(m map[string]any, key string) string {
 	v, ok := m[key]
 	if !ok {
@@ -26,7 +25,6 @@ func getStringParam(m map[string]any, key string) string {
 	return s
 }
 
-// getNumberParam extracts a numeric parameter from the map as float64.
 func getNumberParam(m map[string]any, key string) (float64, bool) {
 	v, ok := m[key]
 	if !ok {
@@ -44,7 +42,6 @@ func getNumberParam(m map[string]any, key string) (float64, bool) {
 	}
 }
 
-// getIntParam extracts an integer parameter from the map.
 func getIntParam(m map[string]any, key string) (int, bool) {
 	n, ok := getNumberParam(m, key)
 	if !ok {
@@ -53,7 +50,6 @@ func getIntParam(m map[string]any, key string) (int, bool) {
 	return int(n), true
 }
 
-// getStringSliceParam extracts a string slice parameter from the map.
 func getStringSliceParam(m map[string]any, key string) []string {
 	v, ok := m[key]
 	if !ok {
@@ -76,7 +72,6 @@ func getStringSliceParam(m map[string]any, key string) []string {
 	}
 }
 
-// getIntSliceParam extracts an integer slice parameter from the map.
 func getIntSliceParam(m map[string]any, key string) []int {
 	v, ok := m[key]
 	if !ok {
@@ -102,7 +97,6 @@ func getIntSliceParam(m map[string]any, key string) []int {
 	return result
 }
 
-// getBoolParam extracts a boolean parameter from the map.
 func getBoolParam(m map[string]any, key string) (bool, bool) {
 	v, ok := m[key]
 	if !ok {
@@ -112,7 +106,6 @@ func getBoolParam(m map[string]any, key string) (bool, bool) {
 	return b, ok
 }
 
-// getMapParam extracts a map parameter from the map.
 func getMapParam(m map[string]any, key string) map[string]any {
 	v, ok := m[key]
 	if !ok {
@@ -159,16 +152,29 @@ func lastDayRange() (int64, int64) {
 	return start.Unix(), end.Unix()
 }
 
-// lastWeekRange returns (Monday 00:00:00, Sunday 23:59:59) of the previous week in local time.
-func lastWeekRange() (int64, int64) {
+// currentWeekMonday returns the Monday 00:00:00 of the current ISO week in local time.
+func currentWeekMonday() time.Time {
 	now := time.Now()
 	wd := int(now.Weekday())
 	if wd == 0 {
 		wd = 7 // ISO: Sunday = 7
 	}
-	thisMonday := time.Date(now.Year(), now.Month(), now.Day()-wd+1, 0, 0, 0, 0, now.Location())
+	return time.Date(now.Year(), now.Month(), now.Day()-wd+1, 0, 0, 0, 0, now.Location())
+}
+
+// lastWeekRange returns (Monday 00:00:00, Sunday 23:59:59) of the previous week in local time.
+func lastWeekRange() (int64, int64) {
+	thisMonday := currentWeekMonday()
 	start := thisMonday.AddDate(0, 0, -7)
 	end := thisMonday.Add(-time.Second)
+	return start.Unix(), end.Unix()
+}
+
+// weekBeforeLastRange returns (Monday 00:00:00, Sunday 23:59:59) of the week before last week in local time.
+func weekBeforeLastRange() (int64, int64) {
+	thisMonday := currentWeekMonday()
+	start := thisMonday.AddDate(0, 0, -14)
+	end := thisMonday.AddDate(0, 0, -7).Add(-time.Second)
 	return start.Unix(), end.Unix()
 }
 
@@ -177,6 +183,7 @@ func lastWeekRange() (int64, int64) {
 //   - Duration: "1h", "24h", "7d", "30d", "1w", "6M" (end time = now)
 //   - Named:    "last_day" (yesterday 00:00:00 to 23:59:59)
 //     "last_week" (Monday 00:00:00 to Sunday 23:59:59 of previous week)
+//     "week_before_last" (Monday 00:00:00 to Sunday 23:59:59 of the week before last week)
 func parseTimeRange(tr string) (int64, int64, error) {
 	tr = strings.TrimSpace(tr)
 	if tr == "" {
@@ -191,6 +198,9 @@ func parseTimeRange(tr string) (int64, int64, error) {
 	case "last_week":
 		s, e := lastWeekRange()
 		return s, e, nil
+	case "week_before_last":
+		s, e := weekBeforeLastRange()
+		return s, e, nil
 	}
 
 	// Duration-based ranges
@@ -198,7 +208,7 @@ func parseTimeRange(tr string) (int64, int64, error) {
 	numStr := tr[:len(tr)-1]
 	n, err := strconv.Atoi(numStr)
 	if err != nil || n <= 0 {
-		return 0, 0, fmt.Errorf("invalid time_range %q: must be a duration (e.g., '24h', '7d') or a named range ('last_day', 'last_week')", tr)
+		return 0, 0, fmt.Errorf("invalid time_range %q: must be a duration (e.g., '24h', '7d') or a named range ('last_day', 'last_week', 'week_before_last')", tr)
 	}
 	now := time.Now()
 	var dur time.Duration
@@ -280,7 +290,6 @@ var alertBriefFields = []string{
 	"created_at", "channel_name", "channel_id",
 }
 
-// handleListIncidents handles the list_incidents tool call.
 func handleListIncidents(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -318,7 +327,6 @@ func handleListIncidents(client any, params map[string]any) (string, error) {
 	return enrichIncidentList(c, result), nil
 }
 
-// handleGetIncident handles the get_incident tool call.
 func handleGetIncident(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -341,7 +349,6 @@ func handleGetIncident(client any, params map[string]any) (string, error) {
 	return enrichIncidentDetail(c, result), nil
 }
 
-// handleCreateIncident handles the create_incident tool call.
 func handleCreateIncident(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -370,7 +377,6 @@ func handleCreateIncident(client any, params map[string]any) (string, error) {
 	return c.DoRequest("/incident/create", body)
 }
 
-// handleAckIncidents handles the ack_incidents tool call.
 func handleAckIncidents(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -387,7 +393,6 @@ func handleAckIncidents(client any, params map[string]any) (string, error) {
 		fmt.Sprintf("Successfully acknowledged %d incident(s)", len(incidentIDs)))
 }
 
-// handleResolveIncidents handles the resolve_incidents tool call.
 func handleResolveIncidents(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -407,7 +412,6 @@ func handleResolveIncidents(client any, params map[string]any) (string, error) {
 		fmt.Sprintf("Successfully resolved %d incident(s)", len(incidentIDs)))
 }
 
-// handleReopenIncidents handles the reopen_incidents tool call.
 func handleReopenIncidents(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -431,7 +435,6 @@ func handleReopenIncidents(client any, params map[string]any) (string, error) {
 		fmt.Sprintf("Successfully reopened %d incident(s)", len(incidentIDs)))
 }
 
-// handleSnoozeIncidents handles the snooze_incidents tool call.
 func handleSnoozeIncidents(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -458,7 +461,6 @@ func handleSnoozeIncidents(client any, params map[string]any) (string, error) {
 		fmt.Sprintf("Successfully snoozed %d incident(s) for %d minutes", len(incidentIDs), minutes))
 }
 
-// handleCommentIncidents handles the comment_incidents tool call.
 func handleCommentIncidents(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -484,7 +486,6 @@ func handleCommentIncidents(client any, params map[string]any) (string, error) {
 
 // ===== Alert Handlers =====
 
-// handleListAlerts handles the list_alerts tool call.
 func handleListAlerts(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -521,7 +522,6 @@ func handleListAlerts(client any, params map[string]any) (string, error) {
 	return result, nil
 }
 
-// handleGetAlert handles the get_alert tool call.
 func handleGetAlert(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -540,7 +540,6 @@ func handleGetAlert(client any, params map[string]any) (string, error) {
 	return c.DoRequest("/alert/info", body)
 }
 
-// handleCloseAlerts handles the close_alerts tool call.
 func handleCloseAlerts(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -559,7 +558,6 @@ func handleCloseAlerts(client any, params map[string]any) (string, error) {
 
 // ===== Channel Handlers =====
 
-// handleListChannels handles the list_channels tool call.
 func handleListChannels(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -568,7 +566,6 @@ func handleListChannels(client any, params map[string]any) (string, error) {
 	return doQueryList(c, "/channel/list", params)
 }
 
-// handleGetChannel handles the get_channel tool call.
 func handleGetChannel(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -589,7 +586,6 @@ func handleGetChannel(client any, params map[string]any) (string, error) {
 
 // ===== Team Handlers =====
 
-// handleListTeams handles the list_teams tool call.
 func handleListTeams(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -600,7 +596,6 @@ func handleListTeams(client any, params map[string]any) (string, error) {
 
 // ===== Member Handlers =====
 
-// handleListMembers handles the list_members tool call.
 func handleListMembers(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -611,7 +606,6 @@ func handleListMembers(client any, params map[string]any) (string, error) {
 
 // ===== Schedule Handlers =====
 
-// handleListSchedules handles the list_schedules tool call.
 func handleListSchedules(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -635,7 +629,6 @@ func handleListSchedules(client any, params map[string]any) (string, error) {
 
 // ===== Insight Handlers =====
 
-// handleGetIncidentStats handles the get_incident_stats tool call.
 func handleGetIncidentStats(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -666,7 +659,6 @@ func handleGetIncidentStats(client any, params map[string]any) (string, error) {
 
 // ===== Incident Timeline Handler =====
 
-// handleGetIncidentTimeline handles the get_incident_timeline tool call.
 func handleGetIncidentTimeline(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -694,7 +686,6 @@ func handleGetIncidentTimeline(client any, params map[string]any) (string, error
 
 // ===== Incident-Alert Association Handler =====
 
-// handleListIncidentAlerts handles the list_incident_alerts tool call.
 func handleListIncidentAlerts(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -720,7 +711,6 @@ func handleListIncidentAlerts(client any, params map[string]any) (string, error)
 
 // ===== Similar Incidents Handler =====
 
-// handleListSimilarIncidents handles the list_similar_incidents tool call.
 func handleListSimilarIncidents(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -749,7 +739,6 @@ func handleListSimilarIncidents(client any, params map[string]any) (string, erro
 
 // ===== Update Incident Handler =====
 
-// handleUpdateIncident handles the update_incident tool call.
 func handleUpdateIncident(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -781,7 +770,6 @@ func handleUpdateIncident(client any, params map[string]any) (string, error) {
 
 // ===== Assign Incident Handler =====
 
-// handleAssignIncident handles the assign_incident tool call.
 func handleAssignIncident(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -820,7 +808,6 @@ func handleAssignIncident(client any, params map[string]any) (string, error) {
 
 // ===== Change Handlers =====
 
-// handleQueryChanges handles the query_changes tool call.
 func handleQueryChanges(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -863,7 +850,6 @@ func handleQueryChanges(client any, params map[string]any) (string, error) {
 
 // ===== Escalation Rules Handler =====
 
-// handleQueryEscalationRules handles the query_escalation_rules tool call.
 func handleQueryEscalationRules(client any, params map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {
@@ -884,7 +870,6 @@ func handleQueryEscalationRules(client any, params map[string]any) (string, erro
 
 // ===== Custom Fields Handler =====
 
-// handleQueryFields handles the query_fields tool call.
 func handleQueryFields(client any, _ map[string]any) (string, error) {
 	c, err := getClient(client)
 	if err != nil {

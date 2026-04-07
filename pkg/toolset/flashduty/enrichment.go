@@ -140,7 +140,6 @@ func fetchNamesConcurrently(c *Client, personIDSet map[int]struct{}, channelIDSe
 	return personNames, channelNames
 }
 
-// collectIncidentIDs extracts all person and channel IDs from an incident object.
 func collectIncidentIDs(obj map[string]any, personIDs, channelIDs map[int]struct{}) {
 	collectIntID(obj, "creator_id", personIDs)
 	collectIntID(obj, "closer_id", personIDs)
@@ -174,7 +173,6 @@ func collectIntID(obj map[string]any, field string, set map[int]struct{}) {
 	}
 }
 
-// collectResponderPersonIDs collects person IDs from the responders array.
 func collectResponderPersonIDs(obj map[string]any, set map[int]struct{}) {
 	responders, ok := obj["responders"].([]any)
 	if !ok {
@@ -187,7 +185,6 @@ func collectResponderPersonIDs(obj map[string]any, set map[int]struct{}) {
 	}
 }
 
-// collectAssignedToPersonIDs collects person IDs from the assigned_to object.
 func collectAssignedToPersonIDs(obj map[string]any, set map[int]struct{}) {
 	assignedTo, ok := obj["assigned_to"].(map[string]any)
 	if !ok {
@@ -225,7 +222,6 @@ func injectChannelName(obj map[string]any, idField, nameField string, names map[
 	}
 }
 
-// enrichResponders enriches each responder with person_name.
 func enrichResponders(obj map[string]any, personNames map[int]string) {
 	responders, ok := obj["responders"].([]any)
 	if !ok {
@@ -260,7 +256,6 @@ func enrichAssignedTo(obj map[string]any, personNames map[int]string) {
 	assignedTo["person_names"] = names
 }
 
-// intSetToSlice converts a set of ints to a slice.
 func intSetToSlice(set map[int]struct{}) []int {
 	result := make([]int, 0, len(set))
 	for id := range set {

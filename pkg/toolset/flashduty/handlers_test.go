@@ -82,6 +82,71 @@ func TestParseTimeRange_NamedRanges(t *testing.T) {
 			t.Fatalf("should accept case-insensitive named ranges: %v", err)
 		}
 	})
+
+	t.Run("week_before_last", func(t *testing.T) {
+		start, end, err := parseTimeRange("week_before_last")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if start >= end {
+			t.Errorf("start (%d) should be before end (%d)", start, end)
+		}
+		// Verify it covers exactly one week (7*86400 - 1 seconds apart)
+		diff := end - start
+		expected := int64(7*86400 - 1)
+		if diff != expected {
+			t.Errorf("week_before_last range should be %d seconds, got %d", expected, diff)
+		}
+		// Verify end time is exactly 1 second before lastWeekRange start
+		lastWeekStart, _, _ := parseTimeRange("last_week")
+		if end != lastWeekStart-1 {
+			t.Errorf("week_before_last end (%d) should be exactly 1 second before last_week start (%d)", end, lastWeekStart)
+		}
+	})
+}
+
+// ===== weekBeforeLastRange Tests =====
+
+func TestWeekBeforeLastRange(t *testing.T) {
+	start, end := weekBeforeLastRange()
+
+	// Verify start < end
+	if start >= end {
+		t.Errorf("start (%d) should be before end (%d)", start, end)
+	}
+
+	// Verify range is exactly 7 days - 1 second
+	diff := end - start
+	expected := int64(7*86400 - 1)
+	if diff != expected {
+		t.Errorf("weekBeforeLastRange should span %d seconds, got %d", expected, diff)
+	}
+
+	// Verify start is a Monday 00:00:00 in local time
+	startTime := time.Unix(start, 0)
+	if startTime.Weekday() != time.Monday {
+		t.Errorf("weekBeforeLastRange start should be Monday, got %s", startTime.Weekday())
+	}
+	if startTime.Hour() != 0 || startTime.Minute() != 0 || startTime.Second() != 0 {
+		t.Errorf("weekBeforeLastRange start should be 00:00:00, got %02d:%02d:%02d",
+			startTime.Hour(), startTime.Minute(), startTime.Second())
+	}
+
+	// Verify end is a Sunday 23:59:59 in local time
+	endTime := time.Unix(end, 0)
+	if endTime.Weekday() != time.Sunday {
+		t.Errorf("weekBeforeLastRange end should be Sunday, got %s", endTime.Weekday())
+	}
+	if endTime.Hour() != 23 || endTime.Minute() != 59 || endTime.Second() != 59 {
+		t.Errorf("weekBeforeLastRange end should be 23:59:59, got %02d:%02d:%02d",
+			endTime.Hour(), endTime.Minute(), endTime.Second())
+	}
+
+	// Verify end is exactly 1 second before lastWeekRange start
+	lastWeekStart, _ := lastWeekRange()
+	if end != lastWeekStart-1 {
+		t.Errorf("weekBeforeLastRange end (%d) should be exactly 1 second before lastWeekRange start (%d)", end, lastWeekStart)
+	}
 }
 
 func TestParseTimeRange_Invalid(t *testing.T) {
