@@ -1,3 +1,4 @@
+// Package mcp configures the FlashDuty MCP server and its tools.
 package mcp
 
 import (
@@ -95,7 +96,7 @@ func (s *Server) shouldEnableTool(toolName string) bool {
 func (s *Server) registerTool(tool toolset.ServerTool) error {
 	client := s.client
 
-	toolHandler := server.ToolHandlerFunc(func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	toolHandler := server.ToolHandlerFunc(func(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		logging.Debug("Tool %s called with params: %v", tool.Tool.Name, request.Params.Arguments)
 
 		params, _ := request.Params.Arguments.(map[string]any)

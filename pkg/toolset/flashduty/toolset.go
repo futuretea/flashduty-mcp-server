@@ -1,3 +1,4 @@
+// Package flashduty implements FlashDuty MCP tools and API helpers.
 package flashduty
 
 import (
@@ -17,10 +18,12 @@ var (
 	itemsString  = map[string]any{"type": "string"}
 )
 
+// GetName returns the FlashDuty toolset name.
 func (t *Toolset) GetName() string {
 	return "flashduty"
 }
 
+// GetDescription returns a human-readable FlashDuty toolset description.
 func (t *Toolset) GetDescription() string {
 	return "FlashDuty incident management and alert tools"
 }

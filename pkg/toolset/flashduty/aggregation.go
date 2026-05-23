@@ -1,3 +1,4 @@
+// Package flashduty implements FlashDuty MCP tools and API helpers.
 package flashduty
 
 import (
@@ -245,10 +246,10 @@ func fetchIncidentPage(c *Client, body map[string]any) ([]map[string]any, string
 }
 
 // appendIncidentItems appends items to the collection, respecting the max limit.
-func appendIncidentItems(all []map[string]any, items []map[string]any, max int) []map[string]any {
+func appendIncidentItems(all []map[string]any, items []map[string]any, maxItems int) []map[string]any {
 	for _, item := range items {
 		all = append(all, item)
-		if len(all) >= max {
+		if len(all) >= maxItems {
 			break
 		}
 	}

@@ -1,3 +1,4 @@
+// Package cmd contains the FlashDuty MCP server CLI commands.
 package cmd
 
 import (
@@ -60,11 +61,11 @@ network access. Manage incidents, alerts, channels, teams, members, and
 on-call schedules through the FlashDuty API.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			bindFlags(cmd)
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			return runServer(cfgFile, streams)
 		},
 	}
@@ -130,8 +131,12 @@ func runServer(cfgFile string, streams IOStreams) error {
 	// Start server based on port configuration
 	if cfg.Port == 0 {
 		// Stdio mode - use fmt.Fprintf for startup messages as logging is disabled
-		fmt.Fprintf(streams.ErrOut, "Starting FlashDuty MCP Server in stdio mode\n")
-		fmt.Fprintf(streams.ErrOut, "Enabled tools: %v\n", server.GetEnabledTools())
+		if _, err := fmt.Fprintf(streams.ErrOut, "Starting FlashDuty MCP Server in stdio mode\n"); err != nil {
+			return fmt.Errorf("failed to write startup message: %w", err)
+		}
+		if _, err := fmt.Fprintf(streams.ErrOut, "Enabled tools: %v\n", server.GetEnabledTools()); err != nil {
+			return fmt.Errorf("failed to write enabled tools: %w", err)
+		}
 		return server.ServeStdio()
 	}
 
@@ -151,8 +156,9 @@ func newVersionCommand(streams IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print version information",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Fprintf(streams.Out, "%s\n", version.GetVersionInfo())
+		RunE: func(_ *cobra.Command, _ []string) error {
+			_, err := fmt.Fprintf(streams.Out, "%s\n", version.GetVersionInfo())
+			return err
 		},
 	}
 

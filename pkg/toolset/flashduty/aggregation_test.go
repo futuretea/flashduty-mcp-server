@@ -170,7 +170,7 @@ func TestBuildCompositeKey_EmptyValues(t *testing.T) {
 // single-page response (has_next_page=false) in the standard FlashDuty API envelope.
 func newMockServer(t *testing.T, incidents []map[string]any) *httptest.Server {
 	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		data := map[string]any{
 			"items":         incidents,
 			"has_next_page": false,

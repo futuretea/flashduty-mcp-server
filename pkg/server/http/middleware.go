@@ -1,3 +1,4 @@
+// Package http serves the FlashDuty MCP server over HTTP, SSE, and health endpoints.
 package http
 
 import (
@@ -9,6 +10,7 @@ import (
 	"github.com/futuretea/flashduty-mcp-server/pkg/core/logging"
 )
 
+// RequestMiddleware logs non-health HTTP requests and response statuses.
 func RequestMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == healthEndpoint {

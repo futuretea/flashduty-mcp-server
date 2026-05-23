@@ -1,3 +1,4 @@
+// Package logging wraps the process-wide structured logger.
 package logging
 
 import (
