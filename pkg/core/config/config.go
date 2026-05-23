@@ -1,3 +1,4 @@
+// Package config loads and validates FlashDuty MCP server configuration.
 package config
 
 import (

@@ -1,3 +1,4 @@
+// Package toolset defines shared MCP toolset interfaces.
 package toolset
 
 import (

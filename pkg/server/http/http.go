@@ -1,3 +1,4 @@
+// Package http serves the FlashDuty MCP server over HTTP, SSE, and health endpoints.
 package http
 
 import (
@@ -21,6 +22,7 @@ const (
 	sseMessageEndpoint = "/message"
 )
 
+// Serve starts the HTTP, SSE, and streamable HTTP endpoints.
 func Serve(ctx context.Context, mcpServer *mcp.Server, staticConfig *config.StaticConfig) error {
 	mux := http.NewServeMux()
 
@@ -32,17 +34,17 @@ func Serve(ctx context.Context, mcpServer *mcp.Server, staticConfig *config.Stat
 	}
 
 	sseServer := mcpServer.ServeSse(staticConfig.SSEBaseURL, httpServer)
-	streamableHttpServer := mcpServer.ServeHTTP(httpServer)
+	streamableHTTPServer := mcpServer.ServeHTTP(httpServer)
 	mux.Handle(sseEndpoint, sseServer)
 	mux.Handle(sseMessageEndpoint, sseServer)
-	mux.Handle(mcpEndpoint, streamableHttpServer)
-	mux.HandleFunc(healthEndpoint, func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle(mcpEndpoint, streamableHTTPServer)
+	mux.HandleFunc(healthEndpoint, func(w http.ResponseWriter, _ *http.Request) {
 		if mcpServer.IsHealthy() {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("healthy"))
+			_, _ = w.Write([]byte("healthy"))
 		} else {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte("unhealthy: FlashDuty client initialization failed"))
+			_, _ = w.Write([]byte("unhealthy: FlashDuty client initialization failed"))
 		}
 	})
 

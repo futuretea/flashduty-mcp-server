@@ -1,3 +1,4 @@
+// Package main starts the FlashDuty MCP server command.
 package main
 
 import (

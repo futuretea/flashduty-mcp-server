@@ -184,7 +184,7 @@ func TestEnrichResponders(t *testing.T) {
 	}
 }
 
-func TestEnrichResponders_NoResponders(t *testing.T) {
+func TestEnrichResponders_NoResponders(_ *testing.T) {
 	obj := map[string]any{}
 	names := map[int]string{1: "Alice"}
 	// Should not panic
@@ -216,7 +216,7 @@ func TestEnrichAssignedTo(t *testing.T) {
 	}
 }
 
-func TestEnrichAssignedTo_NoAssignedTo(t *testing.T) {
+func TestEnrichAssignedTo_NoAssignedTo(_ *testing.T) {
 	obj := map[string]any{}
 	names := map[int]string{1: "Alice"}
 	// Should not panic

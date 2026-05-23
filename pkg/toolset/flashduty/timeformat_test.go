@@ -169,7 +169,7 @@ func TestAddTimestampDisplayToList_MultipleItems(t *testing.T) {
 	}
 }
 
-func TestAddTimestampDisplayToList_EmptyList(t *testing.T) {
+func TestAddTimestampDisplayToList_EmptyList(_ *testing.T) {
 	// Should not panic.
 	AddTimestampDisplayToList([]interface{}{}, time.UTC)
 }
