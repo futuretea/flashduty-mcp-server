@@ -1,6 +1,7 @@
 package flashduty
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -54,7 +55,7 @@ func parseResponse(resp *apiResponse) (string, error) {
 	if resp.Error != nil && resp.Error.Code != "" {
 		return "", fmt.Errorf("API error [%s]: %s", resp.Error.Code, resp.Error.Message)
 	}
-	if resp.Data != nil {
+	if len(resp.Data) > 0 && !bytes.Equal(bytes.TrimSpace(resp.Data), []byte("null")) {
 		return marshalOrFallback(resp.Data, string(resp.Data)), nil
 	}
 	return "OK", nil

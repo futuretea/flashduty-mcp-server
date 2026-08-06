@@ -5,6 +5,16 @@ import (
 	"testing"
 )
 
+func TestParseResponse_NullData_ReturnsOK(t *testing.T) {
+	got, err := parseResponse(&apiResponse{Data: json.RawMessage("null")})
+	if err != nil {
+		t.Fatalf("parseResponse() error = %v", err)
+	}
+	if got != "OK" {
+		t.Errorf("parseResponse() = %q, want OK", got)
+	}
+}
+
 func TestFilterBriefList_ValidJSON(t *testing.T) {
 	input := `{
 		"items": [

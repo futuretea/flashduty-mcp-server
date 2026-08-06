@@ -198,7 +198,7 @@ func buildIncidentListRequest(req *AggregateRequest, searchAfterCtx string) map[
 		body["incident_severity"] = strings.Join(req.Severities, ",")
 	}
 	if req.Query != "" {
-		body["title"] = req.Query
+		body["query"] = req.Query
 	}
 	if searchAfterCtx != "" {
 		body["search_after_ctx"] = searchAfterCtx

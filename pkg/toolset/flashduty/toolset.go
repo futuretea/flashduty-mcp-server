@@ -2,6 +2,9 @@
 package flashduty
 
 import (
+	"fmt"
+	"math"
+
 	"github.com/mark3labs/mcp-go/mcp"
 
 	"github.com/futuretea/flashduty-mcp-server/pkg/toolset"
@@ -9,7 +12,7 @@ import (
 
 // Toolset provides FlashDuty incident management tools.
 type Toolset struct {
-	// ReadOnly disables write operations (create, ack, resolve, reopen, snooze, comment, close, update, assign)
+	// ReadOnly disables write operations (create, ack, resolve, reopen, snooze, comment, update, assign)
 	ReadOnly bool
 }
 
@@ -17,6 +20,49 @@ var (
 	itemsInteger = map[string]any{"type": "integer"}
 	itemsString  = map[string]any{"type": "string"}
 )
+
+const maxSafeJSONInteger = 1<<53 - 1
+
+func withInteger(name string, opts ...mcp.PropertyOption) mcp.ToolOption {
+	return func(tool *mcp.Tool) {
+		schema := map[string]any{"type": "integer"}
+		for _, opt := range opts {
+			opt(schema)
+		}
+		if required, ok := schema["required"].(bool); ok && required {
+			delete(schema, "required")
+			tool.InputSchema.Required = append(tool.InputSchema.Required, name)
+		}
+		tool.InputSchema.Properties[name] = schema
+	}
+}
+
+func validateIntegerInputs(handler toolset.ToolHandler) toolset.ToolHandler {
+	return func(client any, params map[string]any) (string, error) {
+		for key, value := range params {
+			if err := validateIntegerInput(key, value); err != nil {
+				return "", err
+			}
+		}
+		return handler(client, params)
+	}
+}
+
+func validateIntegerInput(key string, value any) error {
+	switch value := value.(type) {
+	case float64:
+		if math.IsNaN(value) || math.IsInf(value, 0) || math.Trunc(value) != value || value < -maxSafeJSONInteger || value > maxSafeJSONInteger {
+			return fmt.Errorf("%s must be a safely representable integer", key)
+		}
+	case []any:
+		for _, item := range value {
+			if err := validateIntegerInput(key, item); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 
 // GetName returns the FlashDuty toolset name.
 func (t *Toolset) GetName() string {
@@ -36,12 +82,12 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 			Tool: mcp.NewTool("list_incidents",
 				mcp.WithDescription("List incidents from FlashDuty. Specify time_range (e.g., '24h', '7d') or start_time+end_time (unix seconds). Use brief=true to reduce response size (recommended for initial queries)."),
 				mcp.WithString("time_range",
-					mcp.Description("Relative time range: duration '1h', '24h', '7d', '30d', '1w', '6M', or named range 'last_day', 'last_week', 'week_before_last'. Alternative to start_time+end_time."),
+					mcp.Description("Relative time range up to 31 days: duration '1h', '24h', '7d', '30d', '1w', or named range 'last_day', 'last_week', 'week_before_last'. Alternative to start_time+end_time."),
 				),
-				mcp.WithNumber("start_time",
+				withInteger("start_time",
 					mcp.Description("Search interval start time in unix seconds. Required if time_range is not set."),
 				),
-				mcp.WithNumber("end_time",
+				withInteger("end_time",
 					mcp.Description("Search interval end time in unix seconds. Required if time_range is not set."),
 				),
 				mcp.WithBoolean("brief",
@@ -53,8 +99,8 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 				mcp.WithString("incident_severity",
 					mcp.Description("Filter by severity. Options: 'Critical', 'Warning', 'Info', or comma-separated combination."),
 				),
-				mcp.WithString("title",
-					mcp.Description("Filter by incident title. Exact match by default, wrap with '/' for regex, use '*' or '?' for wildcards."),
+				mcp.WithString("query",
+					mcp.Description("Full-text search keyword for incidents."),
 				),
 				mcp.WithArray("channel_ids",
 					mcp.Description("Filter by collaboration space IDs."),
@@ -72,13 +118,10 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 					mcp.Description("Filter by creator person IDs. 0 means system-generated."),
 					mcp.Items(itemsInteger),
 				),
-				mcp.WithObject("labels",
-					mcp.Description("Filter by labels. Object with label key -> array of values. Supports exact, regex (/pattern/), and wildcard (*,?) matching."),
-				),
-				mcp.WithNumber("limit",
+				withInteger("limit",
 					mcp.Description("Page size (1-100, default 20)."),
 				),
-				mcp.WithNumber("p",
+				withInteger("p",
 					mcp.Description("Page number starting from 1."),
 				),
 			),
@@ -100,22 +143,19 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 			Tool: mcp.NewTool("list_alerts",
 				mcp.WithDescription("List alerts from FlashDuty. Specify time_range (e.g., '24h', '7d') or start_time+end_time (unix seconds). Use brief=true to reduce response size."),
 				mcp.WithString("time_range",
-					mcp.Description("Relative time range: duration '1h', '24h', '7d', '30d', '1w', '6M', or named range 'last_day', 'last_week', 'week_before_last'. Alternative to start_time+end_time."),
+					mcp.Description("Relative time range up to 31 days: duration '1h', '24h', '7d', '30d', '1w', or named range 'last_day', 'last_week', 'week_before_last'. Alternative to start_time+end_time."),
 				),
-				mcp.WithNumber("start_time",
+				withInteger("start_time",
 					mcp.Description("Search interval start time in unix seconds. Required if time_range is not set."),
 				),
-				mcp.WithNumber("end_time",
+				withInteger("end_time",
 					mcp.Description("Search interval end time in unix seconds. Required if time_range is not set."),
 				),
 				mcp.WithBoolean("brief",
-					mcp.Description("If true, return only key fields (alert_id, title, alert_severity, is_active, created_at, channel_name, channel_id) to reduce data volume."),
+					mcp.Description("If true, return only key fields (alert_id, title, alert_severity, alert_status, created_at, channel_name, channel_id) to reduce data volume."),
 				),
 				mcp.WithString("alert_severity",
-					mcp.Description("Filter by severity. Options: 'Critical', 'Warning', 'Info', or comma-separated combination."),
-				),
-				mcp.WithString("title",
-					mcp.Description("Filter by alert title. Supports exact match, regex (wrap with '/'), and wildcards ('*', '?')."),
+					mcp.Description("Filter by severity. Options: 'Critical', 'Warning', 'Info', 'Ok', or a comma-separated combination."),
 				),
 				mcp.WithBoolean("is_active",
 					mcp.Description("Filter by active status. true=active only, false=recovered only, omit=all."),
@@ -124,13 +164,10 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 					mcp.Description("Filter by collaboration space IDs."),
 					mcp.Items(itemsInteger),
 				),
-				mcp.WithObject("labels",
-					mcp.Description("Filter by labels. Object with label key -> array of values. Supports exact, regex (/pattern/), and wildcard (*,?) matching."),
-				),
-				mcp.WithNumber("limit",
+				withInteger("limit",
 					mcp.Description("Page size (1-100, default 20)."),
 				),
-				mcp.WithNumber("p",
+				withInteger("p",
 					mcp.Description("Page number starting from 1."),
 				),
 			),
@@ -154,10 +191,10 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 				mcp.WithString("query",
 					mcp.Description("Search keyword to match channel name and description."),
 				),
-				mcp.WithNumber("limit",
+				withInteger("limit",
 					mcp.Description("Page size."),
 				),
-				mcp.WithNumber("p",
+				withInteger("p",
 					mcp.Description("Page number starting from 1."),
 				),
 			),
@@ -166,7 +203,7 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 		{
 			Tool: mcp.NewTool("get_channel",
 				mcp.WithDescription("Get detailed information about a specific collaboration space (channel) by its ID."),
-				mcp.WithNumber("channel_id",
+				withInteger("channel_id",
 					mcp.Required(),
 					mcp.Description("The channel ID."),
 				),
@@ -181,10 +218,10 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 				mcp.WithString("query",
 					mcp.Description("Search keyword to match team name and description."),
 				),
-				mcp.WithNumber("limit",
+				withInteger("limit",
 					mcp.Description("Page size."),
 				),
-				mcp.WithNumber("p",
+				withInteger("p",
 					mcp.Description("Page number starting from 1."),
 				),
 			),
@@ -198,10 +235,10 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 				mcp.WithString("query",
 					mcp.Description("Search keyword to match member name and email. If recognized as phone number, will match phone strictly."),
 				),
-				mcp.WithNumber("limit",
+				withInteger("limit",
 					mcp.Description("Page size."),
 				),
-				mcp.WithNumber("p",
+				withInteger("p",
 					mcp.Description("Page number starting from 1."),
 				),
 			),
@@ -215,11 +252,11 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 				mcp.WithString("time_range",
 					mcp.Description("Relative time range: duration '1h', '24h', '7d', '30d', '1w', '6M', or named range 'last_day', 'last_week', 'week_before_last'. Alternative to start_time+end_time."),
 				),
-				mcp.WithNumber("start_time",
+				withInteger("start_time",
 					mcp.Description("Start time in unix seconds. Required if time_range is not set."),
 				),
-				mcp.WithNumber("end_time",
-					mcp.Description("End time in unix seconds. Max span 6 months. Required if time_range is not set."),
+				withInteger("end_time",
+					mcp.Description("End time in unix seconds. Maximum span one year. Required if time_range is not set."),
 				),
 				mcp.WithArray("channel_ids",
 					mcp.Description("Filter by collaboration space IDs."),
@@ -230,7 +267,7 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 					mcp.Items(itemsInteger),
 				),
 				mcp.WithArray("severities",
-					mcp.Description("Filter by severities. Options: 'Critical', 'Warning', 'Info'."),
+					mcp.Description("Filter by severities. Options: 'Critical', 'Warning', 'Info', 'Ok'."),
 					mcp.Items(itemsString),
 				),
 				mcp.WithString("aggregate_unit",
@@ -258,10 +295,10 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 					mcp.Description("Filter by event types. Options include: 'i_comm' (comment), 'i_notify', 'i_new', 'i_assign', 'i_ack', 'i_rslv', 'i_reopen', 'i_snooze', 'i_merge', 'i_r_severity', etc."),
 					mcp.Items(itemsString),
 				),
-				mcp.WithNumber("limit",
+				withInteger("limit",
 					mcp.Description("Page size."),
 				),
-				mcp.WithNumber("p",
+				withInteger("p",
 					mcp.Description("Page number starting from 1."),
 				),
 			),
@@ -279,10 +316,10 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 				mcp.WithBoolean("is_active",
 					mcp.Description("Filter by active status. true=active only, false=recovered only, omit=all."),
 				),
-				mcp.WithNumber("limit",
+				withInteger("limit",
 					mcp.Description("Page size (max 1000, default 1000)."),
 				),
-				mcp.WithNumber("p",
+				withInteger("p",
 					mcp.Description("Page number starting from 1."),
 				),
 			),
@@ -294,17 +331,16 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 			Tool: mcp.NewTool("list_schedules",
 				mcp.WithDescription("List on-call schedules from FlashDuty."),
 				mcp.WithArray("team_ids",
-					mcp.Required(),
-					mcp.Description("List of team IDs to filter schedules."),
+					mcp.Description("Optional list of team IDs to filter schedules."),
 					mcp.Items(itemsInteger),
 				),
 				mcp.WithString("query",
 					mcp.Description("Search keyword to match schedule name."),
 				),
-				mcp.WithNumber("limit",
+				withInteger("limit",
 					mcp.Description("Page size."),
 				),
-				mcp.WithNumber("p",
+				withInteger("p",
 					mcp.Description("Page number starting from 1."),
 				),
 			),
@@ -319,7 +355,7 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 					mcp.Required(),
 					mcp.Description("The incident ID to find similar incidents for."),
 				),
-				mcp.WithNumber("limit",
+				withInteger("limit",
 					mcp.Description("Maximum number of similar incidents to return (max 20)."),
 				),
 			),
@@ -333,10 +369,10 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 				mcp.WithString("time_range",
 					mcp.Description("Relative time range: '1h', '24h', '7d', '30d', '1w', '6M', or 'last_day', 'last_week', 'week_before_last'. Alternative to start_time+end_time."),
 				),
-				mcp.WithNumber("start_time",
+				withInteger("start_time",
 					mcp.Description("Start time in unix seconds."),
 				),
-				mcp.WithNumber("end_time",
+				withInteger("end_time",
 					mcp.Description("End time in unix seconds."),
 				),
 				mcp.WithString("query",
@@ -359,10 +395,10 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 				mcp.WithBoolean("include_events",
 					mcp.Description("Include change events in the response."),
 				),
-				mcp.WithNumber("limit",
+				withInteger("limit",
 					mcp.Description("Page size (1-100, default 20)."),
 				),
-				mcp.WithNumber("p",
+				withInteger("p",
 					mcp.Description("Page number starting from 1."),
 				),
 			),
@@ -373,7 +409,7 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 		{
 			Tool: mcp.NewTool("query_escalation_rules",
 				mcp.WithDescription("Query escalation rules for a collaboration space. Returns the escalation policy configuration."),
-				mcp.WithNumber("channel_id",
+				withInteger("channel_id",
 					mcp.Required(),
 					mcp.Description("The collaboration space (channel) ID."),
 				),
@@ -394,12 +430,12 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 			Tool: mcp.NewTool("aggregate_incidents",
 				mcp.WithDescription("Aggregate and group incidents by one or more dimensions (e.g., severity, channel, progress, or labels.xxx). Automatically fetches all matching incidents (up to max_incidents) and returns grouped counts with optional per-group details. Useful for incident distribution analysis, SLA reporting, and trend investigation. Specify time_range (e.g., '24h', '7d') or start_time+end_time."),
 				mcp.WithString("time_range",
-					mcp.Description("Relative time range: duration '1h', '24h', '7d', '30d', '1w', '6M', or named range 'last_day', 'last_week', 'week_before_last'. Alternative to start_time+end_time."),
+					mcp.Description("Relative time range up to 31 days: duration '1h', '24h', '7d', '30d', '1w', or named range 'last_day', 'last_week', 'week_before_last'. Alternative to start_time+end_time."),
 				),
-				mcp.WithNumber("start_time",
+				withInteger("start_time",
 					mcp.Description("Search interval start time in unix seconds. Required if time_range is not set."),
 				),
-				mcp.WithNumber("end_time",
+				withInteger("end_time",
 					mcp.Description("Search interval end time in unix seconds. Required if time_range is not set."),
 				),
 				mcp.WithArray("group_by",
@@ -407,7 +443,7 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 					mcp.Description("Dimensions to group by. Built-in: 'severity'/'incident_severity', 'channel', 'progress'. Custom labels: 'labels.<key>' (e.g., 'labels.env', 'labels.service'). Multiple dimensions create composite groups."),
 					mcp.Items(itemsString),
 				),
-				mcp.WithNumber("channel_id",
+				withInteger("channel_id",
 					mcp.Description("Filter by collaboration space ID. Alternative to channel_name."),
 				),
 				mcp.WithString("channel_name",
@@ -427,7 +463,7 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 					mcp.Description("Fields to include in each detail record when include_details=true. Defaults to: incident_id, title, incident_severity, progress, created_at, channel_name, channel_id."),
 					mcp.Items(itemsString),
 				),
-				mcp.WithNumber("max_incidents",
+				withInteger("max_incidents",
 					mcp.Description("Maximum number of incidents to fetch across all pages (default 500). Increase for larger datasets, but be aware of performance impact."),
 				),
 			),
@@ -443,8 +479,7 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 				Tool: mcp.NewTool("create_incident",
 					mcp.WithDescription("Create a new incident in FlashDuty."),
 					mcp.WithString("title",
-						mcp.Required(),
-						mcp.Description("Incident title."),
+						mcp.Description("Optional incident title."),
 					),
 					mcp.WithString("incident_severity",
 						mcp.Required(),
@@ -453,7 +488,7 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 					mcp.WithString("description",
 						mcp.Description("Incident description. Can be plain text or markdown."),
 					),
-					mcp.WithNumber("channel_id",
+					withInteger("channel_id",
 						mcp.Description("Collaboration space ID to associate the incident with."),
 					),
 				),
@@ -496,8 +531,7 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 						mcp.Items(itemsString),
 					),
 					mcp.WithString("reason",
-						mcp.Required(),
-						mcp.Description("Reason for reopening the incident."),
+						mcp.Description("Optional reason for reopening the incident."),
 					),
 				),
 				Handler: handleReopenIncidents,
@@ -510,7 +544,7 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 						mcp.Description("List of incident IDs to snooze."),
 						mcp.Items(itemsString),
 					),
-					mcp.WithNumber("minutes",
+					withInteger("minutes",
 						mcp.Required(),
 						mcp.Description("Number of minutes to snooze (1-1440)."),
 					),
@@ -526,23 +560,10 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 						mcp.Items(itemsString),
 					),
 					mcp.WithString("comment",
-						mcp.Required(),
-						mcp.Description("Comment content (1-500 characters)."),
+						mcp.Description("Optional comment content (1-1024 characters when provided)."),
 					),
 				),
 				Handler: handleCommentIncidents,
-			},
-			// ===== Alert Write Tools =====
-			toolset.ServerTool{
-				Tool: mcp.NewTool("close_alerts",
-					mcp.WithDescription("Close one or more alerts."),
-					mcp.WithArray("alert_ids",
-						mcp.Required(),
-						mcp.Description("List of alert IDs to close."),
-						mcp.Items(itemsString),
-					),
-				),
-				Handler: handleCloseAlerts,
 			},
 			// ===== Incident Update Tools =====
 			toolset.ServerTool{
@@ -583,14 +604,14 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 						mcp.Items(itemsString),
 					),
 					mcp.WithString("type",
-						mcp.Description("Assignment type: 'assign' for direct person assignment, 'escalateRule' for escalation rule. Default: 'assign'."),
+						mcp.Description("Assignment type: 'assign', 'reassign', 'escalate', or 'reopen'. Default: 'assign'."),
 					),
 					mcp.WithArray("person_ids",
 						mcp.Description("List of person IDs to assign to (when type is 'assign')."),
 						mcp.Items(itemsInteger),
 					),
-					mcp.WithNumber("escalate_rule_id",
-						mcp.Description("Escalation rule ID to assign to (when type is 'escalateRule')."),
+					mcp.WithString("escalate_rule_id",
+						mcp.Description("Escalation rule ObjectID to assign to (when type is 'escalate'). Provide this or person_ids."),
 					),
 				),
 				Handler: handleAssignIncident,
@@ -598,5 +619,8 @@ func (t *Toolset) GetTools(_ any) []toolset.ServerTool {
 		)
 	}
 
+	for i := range tools {
+		tools[i].Handler = validateIntegerInputs(tools[i].Handler)
+	}
 	return tools
 }

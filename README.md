@@ -12,7 +12,7 @@
 A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for [FlashDuty](https://flashcat.cloud/) incident management.
 
 - **Incident Management**: List, create, acknowledge, resolve, reopen, snooze, and comment on incidents
-- **Alert Management**: List, get details, and close alerts
+- **Alert Management**: List and get alert details
 - **Collaboration Spaces**: List and inspect channels (collaboration spaces)
 - **Team & Member Lookup**: List teams and members
 - **On-call Schedules**: Query on-call schedules by team
@@ -20,7 +20,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for [F
 - **Incident Timeline**: View event feed (comments, acks, resolves, escalations, notifications)
 - **Incident-Alert Association**: See which alerts belong to a given incident
 - **Brief Mode**: Reduce response size for LLM token limits by returning only key fields
-- **Advanced Filtering**: Filter by channel, responder, acknowledger, creator, labels, and severity
+- **Advanced Filtering**: Filter by channel, responder, acknowledger, creator, and severity
 - **Security Controls**: `read_only` mode to disable all write operations
 - **Dual Transport**: Stdio mode for MCP client integration or HTTP/SSE mode for network access
 - **Cross-platform**: Native binaries for Linux, macOS, Windows (amd64/arm64), npm package, and Docker images
@@ -160,7 +160,7 @@ flashduty-mcp-server --port 8080 \
 
 Use `--enabled-tools` / `--disabled-tools` for fine-grained control.
 
-Use `--read-only` to disable all write operations (create, acknowledge, resolve, reopen, snooze, comment, close).
+Use `--read-only` to disable all write operations (create, acknowledge, resolve, reopen, snooze, comment, update, assign).
 
 ### Incident Tools
 
@@ -171,20 +171,19 @@ List incidents from FlashDuty. Use `brief=true` to reduce response size (recomme
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `time_range` | string | No | Relative time range: `1h`, `24h`, `7d`, `30d`, `1w`, `6M`, or `last_day`, `last_week`. Alternative to `start_time`+`end_time`. |
-| `start_time` | number | Conditional | Search interval start time in unix seconds. Required if `time_range` is not set. |
-| `end_time` | number | Conditional | Search interval end time in unix seconds. Required if `time_range` is not set. |
+| `time_range` | string | No | Relative time range up to 31 days: `1h`, `24h`, `7d`, `30d`, `1w`, `last_day`, `last_week`, or `week_before_last`. Alternative to `start_time`+`end_time`. |
+| `start_time` | integer | Conditional | Search interval start time in unix seconds. Required if `time_range` is not set. |
+| `end_time` | integer | Conditional | Search interval end time in unix seconds. Required if `time_range` is not set. |
 | `brief` | boolean | No | If true, return only key fields to reduce data volume. |
 | `progress` | string | No | Filter by progress: `Triggered`, `Processing`, `Closed`, or comma-separated. |
 | `incident_severity` | string | No | Filter by severity: `Critical`, `Warning`, `Info`, or comma-separated. |
-| `title` | string | No | Filter by title. Supports exact, regex (`/pattern/`), and wildcards (`*`, `?`). |
+| `query` | string | No | Full-text search keyword for incidents. |
 | `channel_ids` | integer[] | No | Filter by collaboration space IDs. |
 | `responder_ids` | integer[] | No | Filter by responder person IDs. |
 | `acker_ids` | integer[] | No | Filter by acknowledger person IDs. |
 | `creator_ids` | integer[] | No | Filter by creator person IDs. `0` = system-generated. |
-| `labels` | object | No | Filter by labels (key -> array of values). |
-| `limit` | number | No | Page size (1-100, default 20). |
-| `p` | number | No | Page number starting from 1. |
+| `limit` | integer | No | Page size (1-100, default 20). |
+| `p` | integer | No | Page number starting from 1. |
 
 </details>
 
@@ -206,10 +205,10 @@ Create a new incident in FlashDuty. Disabled when `read_only=true`.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `title` | string | Yes | Incident title. |
+| `title` | string | No | Optional incident title. |
 | `incident_severity` | string | Yes | Severity: `Critical`, `Warning`, or `Info`. |
 | `description` | string | No | Incident description (plain text or markdown). |
-| `channel_id` | number | No | Collaboration space ID. |
+| `channel_id` | integer | No | Collaboration space ID. |
 
 </details>
 
@@ -245,7 +244,7 @@ Reopen one or more previously resolved incidents. Disabled when `read_only=true`
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `incident_ids` | string[] | Yes | List of incident IDs to reopen. |
-| `reason` | string | Yes | Reason for reopening. |
+| `reason` | string | No | Optional reason for reopening. |
 
 </details>
 
@@ -257,7 +256,7 @@ Snooze (temporarily mute) one or more incidents. Disabled when `read_only=true`.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `incident_ids` | string[] | Yes | List of incident IDs to snooze. |
-| `minutes` | number | Yes | Minutes to snooze (1-1440). |
+| `minutes` | integer | Yes | Minutes to snooze (1-1440). |
 
 </details>
 
@@ -269,7 +268,7 @@ Add a comment to one or more incidents. Disabled when `read_only=true`.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `incident_ids` | string[] | Yes | List of incident IDs to comment on. |
-| `comment` | string | Yes | Comment content (1-500 characters). |
+| `comment` | string | No | Optional comment content (1-1024 characters when provided). |
 
 </details>
 
@@ -298,9 +297,9 @@ Assign one or more incidents to specific persons or an escalation rule. Disabled
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `incident_ids` | string[] | Yes | List of incident IDs to assign. |
-| `type` | string | No | Assignment type: `assign` (direct) or `escalateRule`. Default: `assign`. |
+| `type` | string | No | Assignment type: `assign`, `reassign`, `escalate`, or `reopen`. Default: `assign`. |
 | `person_ids` | integer[] | No | List of person IDs to assign to (when type is `assign`). |
-| `escalate_rule_id` | number | No | Escalation rule ID (when type is `escalateRule`). |
+| `escalate_rule_id` | string | No | Escalation rule ObjectID (when type is `escalate`). Provide this or `person_ids`. |
 
 </details>
 
@@ -313,17 +312,15 @@ List alerts from FlashDuty. Use `brief=true` to reduce response size.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `time_range` | string | No | Relative time range: `1h`, `24h`, `7d`, `30d`, `1w`, `6M`, or `last_day`, `last_week`. Alternative to `start_time`+`end_time`. |
-| `start_time` | number | Conditional | Search interval start time in unix seconds. Required if `time_range` is not set. |
-| `end_time` | number | Conditional | Search interval end time in unix seconds. Required if `time_range` is not set. |
+| `time_range` | string | No | Relative time range up to 31 days: `1h`, `24h`, `7d`, `30d`, `1w`, `last_day`, `last_week`, or `week_before_last`. Alternative to `start_time`+`end_time`. |
+| `start_time` | integer | Conditional | Search interval start time in unix seconds. Required if `time_range` is not set. |
+| `end_time` | integer | Conditional | Search interval end time in unix seconds. Required if `time_range` is not set. |
 | `brief` | boolean | No | If true, return only key fields to reduce data volume. |
-| `alert_severity` | string | No | Filter by severity: `Critical`, `Warning`, `Info`, or comma-separated. |
-| `title` | string | No | Filter by title. Supports exact, regex, and wildcards. |
+| `alert_severity` | string | No | Filter by severity: `Critical`, `Warning`, `Info`, `Ok`, or comma-separated. |
 | `is_active` | boolean | No | Filter by active status. |
 | `channel_ids` | integer[] | No | Filter by collaboration space IDs. |
-| `labels` | object | No | Filter by labels (key -> array of values). |
-| `limit` | number | No | Page size (1-100, default 20). |
-| `p` | number | No | Page number starting from 1. |
+| `limit` | integer | No | Page size (1-100, default 20). |
+| `p` | integer | No | Page number starting from 1. |
 
 </details>
 
@@ -338,17 +335,6 @@ Get detailed information about a specific alert.
 
 </details>
 
-<details>
-<summary>close_alerts</summary>
-
-Close one or more alerts. Disabled when `read_only=true`.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `alert_ids` | string[] | Yes | List of alert IDs to close. |
-
-</details>
-
 ### Channel Tools
 
 <details>
@@ -359,8 +345,8 @@ List collaboration spaces (channels).
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `query` | string | No | Search keyword to match channel name and description. |
-| `limit` | number | No | Page size. |
-| `p` | number | No | Page number starting from 1. |
+| `limit` | integer | No | Page size. |
+| `p` | integer | No | Page number starting from 1. |
 
 </details>
 
@@ -371,7 +357,7 @@ Get detailed information about a specific channel.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `channel_id` | number | Yes | The channel ID. |
+| `channel_id` | integer | Yes | The channel ID. |
 
 </details>
 
@@ -385,8 +371,8 @@ List teams from FlashDuty.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `query` | string | No | Search keyword to match team name and description. |
-| `limit` | number | No | Page size. |
-| `p` | number | No | Page number starting from 1. |
+| `limit` | integer | No | Page size. |
+| `p` | integer | No | Page number starting from 1. |
 
 </details>
 
@@ -398,8 +384,8 @@ List members from FlashDuty.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `query` | string | No | Search keyword to match name and email. Phone number triggers strict match. |
-| `limit` | number | No | Page size. |
-| `p` | number | No | Page number starting from 1. |
+| `limit` | integer | No | Page size. |
+| `p` | integer | No | Page number starting from 1. |
 
 </details>
 
@@ -412,10 +398,10 @@ List on-call schedules.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `team_ids` | integer[] | Yes | List of team IDs to filter schedules. |
+| `team_ids` | integer[] | No | Optional list of team IDs to filter schedules. |
 | `query` | string | No | Search keyword to match schedule name. |
-| `limit` | number | No | Page size. |
-| `p` | number | No | Page number starting from 1. |
+| `limit` | integer | No | Page size. |
+| `p` | integer | No | Page number starting from 1. |
 
 </details>
 
@@ -428,14 +414,14 @@ Get aggregated incident statistics (MTTA, MTTR, counts, ack rate, noise reductio
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `time_range` | string | No | Relative time range: `1h`, `24h`, `7d`, `30d`, `1w`, `6M`, or `last_day`, `last_week`. Alternative to `start_time`+`end_time`. |
-| `start_time` | number | Conditional | Start time in unix seconds. Required if `time_range` is not set. |
-| `end_time` | number | Conditional | End time in unix seconds (max span 6 months). Required if `time_range` is not set. |
+| `time_range` | string | No | Relative time range: `1h`, `24h`, `7d`, `30d`, `1w`, `6M`, or `last_day`, `last_week`, `week_before_last`. Alternative to `start_time`+`end_time`. |
+| `start_time` | integer | Conditional | Start time in unix seconds. Required if `time_range` is not set. |
+| `end_time` | integer | Conditional | End time in unix seconds. The API allows a maximum one-year span. Required if `time_range` is not set. |
 | `channel_ids` | integer[] | No | Filter by collaboration space IDs. |
 | `team_ids` | integer[] | No | Filter by team IDs. |
-| `severities` | string[] | No | Filter by severities: `Critical`, `Warning`, `Info`. |
+| `severities` | string[] | No | Filter by severities: `Critical`, `Warning`, `Info`, `Ok`. |
 | `aggregate_unit` | string | No | Time aggregation: `day`, `week`, or `month`. |
-| `query` | string | No | Filter by incident title (fuzzy match). |
+| `query` | string | No | Full-text search keyword for incidents. |
 | `labels` | object | No | Filter by labels as key-value pairs. |
 
 </details>
@@ -449,8 +435,8 @@ Get the timeline (feed) of an incident.
 |-----------|------|----------|-------------|
 | `incident_id` | string | Yes | The incident ID. |
 | `types` | string[] | No | Filter by event types (e.g., `i_comm`, `i_ack`, `i_rslv`, `i_notify`). |
-| `limit` | number | No | Page size. |
-| `p` | number | No | Page number starting from 1. |
+| `limit` | integer | No | Page size. |
+| `p` | integer | No | Page number starting from 1. |
 
 </details>
 
@@ -463,8 +449,8 @@ List alerts associated with a specific incident.
 |-----------|------|----------|-------------|
 | `incident_id` | string | Yes | The incident ID. |
 | `is_active` | boolean | No | Filter by active status. |
-| `limit` | number | No | Page size (max 1000, default 1000). |
-| `p` | number | No | Page number starting from 1. |
+| `limit` | integer | No | Page size (max 1000, default 1000). |
+| `p` | integer | No | Page number starting from 1. |
 
 </details>
 
@@ -478,7 +464,7 @@ Find similar historical incidents for a given incident. Useful for pattern analy
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `incident_id` | string | Yes | The incident ID to find similar incidents for. |
-| `limit` | number | No | Maximum number of similar incidents to return (max 20). |
+| `limit` | integer | No | Maximum number of similar incidents to return (max 20). |
 
 </details>
 
@@ -491,17 +477,17 @@ Query deployment/change events from FlashDuty. Useful for correlating incidents 
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `time_range` | string | No | Relative time range: `1h`, `24h`, `7d`, `30d`, `1w`, `6M`, or `last_day`, `last_week`. Alternative to `start_time`+`end_time`. |
-| `start_time` | number | No | Start time in unix seconds. |
-| `end_time` | number | No | End time in unix seconds. |
+| `time_range` | string | No | Relative time range: `1h`, `24h`, `7d`, `30d`, `1w`, `6M`, or `last_day`, `last_week`, `week_before_last`. Alternative to `start_time`+`end_time`. |
+| `start_time` | integer | No | Start time in unix seconds. |
+| `end_time` | integer | No | End time in unix seconds. |
 | `query` | string | No | Search keyword to filter changes. |
 | `channel_ids` | integer[] | No | Filter by collaboration space IDs. |
 | `integration_ids` | integer[] | No | Filter by integration IDs. |
 | `order_by` | string | No | Field to order by (e.g., `start_time`). |
 | `asc` | boolean | No | Sort ascending if true, descending if false. |
 | `include_events` | boolean | No | Include change events in the response. |
-| `limit` | number | No | Page size (1-100, default 20). |
-| `p` | number | No | Page number starting from 1. |
+| `limit` | integer | No | Page size (1-100, default 20). |
+| `p` | integer | No | Page number starting from 1. |
 
 </details>
 
@@ -514,7 +500,7 @@ Query escalation rules for a collaboration space. Returns the escalation policy 
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `channel_id` | number | Yes | The collaboration space (channel) ID. |
+| `channel_id` | integer | Yes | The collaboration space (channel) ID. |
 
 </details>
 

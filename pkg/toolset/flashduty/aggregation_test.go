@@ -191,6 +191,21 @@ func makeClient(baseURL string) *Client {
 	return NewClient(baseURL, "test-app-key", "")
 }
 
+func TestBuildIncidentListRequest_UsesPublishedQueryField(t *testing.T) {
+	body := buildIncidentListRequest(&AggregateRequest{
+		StartTime: 1_000,
+		EndTime:   2_000,
+		Query:     "database",
+	}, "")
+
+	if body["query"] != "database" {
+		t.Errorf("query = %v, want database", body["query"])
+	}
+	if _, ok := body["title"]; ok {
+		t.Error("request must not include title")
+	}
+}
+
 // ===== AggregateIncidents core tests =====
 
 func TestAggregateIncidents_SingleDimension(t *testing.T) {

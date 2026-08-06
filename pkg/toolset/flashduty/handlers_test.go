@@ -214,6 +214,25 @@ func TestResolveTimeParams_MissingEndTime(t *testing.T) {
 	}
 }
 
+func TestResolveListTimeParams_EnforcesPublishedWindow(t *testing.T) {
+	start := int64(1_000_000)
+	_, _, err := resolveListTimeParams(map[string]any{
+		"start_time": float64(start),
+		"end_time":   float64(start + int64((31*24*time.Hour)/time.Second)),
+	})
+	if err != nil {
+		t.Fatalf("31-day window returned error: %v", err)
+	}
+
+	_, _, err = resolveListTimeParams(map[string]any{
+		"start_time": float64(start),
+		"end_time":   float64(start + int64((31*24*time.Hour)/time.Second) + 1),
+	})
+	if err == nil {
+		t.Fatal("expected error for a window longer than 31 days")
+	}
+}
+
 // ===== Parameter Extraction Tests =====
 
 func TestGetStringParam(t *testing.T) {

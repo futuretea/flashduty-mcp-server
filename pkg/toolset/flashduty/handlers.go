@@ -236,18 +236,25 @@ func parseDurationTimeRange(tr string) (int64, int64, error) {
 
 // durationFromUnit converts a numeric value and unit character to a time.Duration.
 func durationFromUnit(n int, unit byte) (time.Duration, error) {
+	var unitDuration time.Duration
 	switch unit {
 	case 'h':
-		return time.Duration(n) * time.Hour, nil
+		unitDuration = time.Hour
 	case 'd':
-		return time.Duration(n) * 24 * time.Hour, nil
+		unitDuration = 24 * time.Hour
 	case 'w':
-		return time.Duration(n) * 7 * 24 * time.Hour, nil
+		unitDuration = 7 * 24 * time.Hour
 	case 'M':
-		return time.Duration(n) * 30 * 24 * time.Hour, nil
+		unitDuration = 30 * 24 * time.Hour
 	default:
 		return 0, fmt.Errorf("invalid time_range unit %q: must be h, d, w, or M", string(unit))
 	}
+
+	const maxDuration = time.Duration(1<<63 - 1)
+	if int64(n) > int64(maxDuration/unitDuration) {
+		return 0, fmt.Errorf("time_range %d%c is too large", n, unit)
+	}
+	return time.Duration(n) * unitDuration, nil
 }
 
 // resolveTimeParams extracts start/end time from params, supporting both
@@ -271,6 +278,22 @@ func resolveTimeParams(params map[string]any) (int64, int64, error) {
 	endTime, err := ParseFlexibleTime(ev)
 	if err != nil {
 		return 0, 0, fmt.Errorf("invalid end_time: %w", err)
+	}
+	return startTime, endTime, nil
+}
+
+const maxListTimeWindow = 31 * 24 * time.Hour
+
+func resolveListTimeParams(params map[string]any) (int64, int64, error) {
+	startTime, endTime, err := resolveTimeParams(params)
+	if err != nil {
+		return 0, 0, err
+	}
+	if endTime <= startTime {
+		return 0, 0, fmt.Errorf("end_time must be after start_time")
+	}
+	if endTime-startTime > int64(maxListTimeWindow/time.Second) {
+		return 0, 0, fmt.Errorf("time window must not exceed 31 days")
 	}
 	return startTime, endTime, nil
 }
@@ -343,7 +366,7 @@ var incidentBriefFields = []string{
 
 // alertBriefFields defines the fields to include in brief mode for alerts.
 var alertBriefFields = []string{
-	"alert_id", "title", "alert_severity", "is_active",
+	"alert_id", "title", "alert_severity", "alert_status",
 	"created_at", "channel_name", "channel_id",
 }
 
@@ -353,7 +376,7 @@ func handleListIncidents(client any, params map[string]any) (string, error) {
 		return "", err
 	}
 
-	startTime, endTime, err := resolveTimeParams(params)
+	startTime, endTime, err := resolveListTimeParams(params)
 	if err != nil {
 		return "", err
 	}
@@ -365,12 +388,11 @@ func handleListIncidents(client any, params map[string]any) (string, error) {
 
 	setOptionalString(params, body, "progress")
 	setOptionalString(params, body, "incident_severity")
-	setOptionalString(params, body, "title")
+	setOptionalString(params, body, "query")
 	setOptionalIntSlice(params, body, "channel_ids")
 	setOptionalIntSlice(params, body, "responder_ids")
 	setOptionalIntSlice(params, body, "acker_ids")
 	setOptionalIntSlice(params, body, "creator_ids")
-	setOptionalMap(params, body, "labels")
 	buildPaginationParams(params, body)
 
 	result, err := c.DoRequest("/incident/list", body)
@@ -412,20 +434,16 @@ func handleCreateIncident(client any, params map[string]any) (string, error) {
 		return "", err
 	}
 
-	title := getStringParam(params, "title")
-	if title == "" {
-		return "", fmt.Errorf("title is required")
-	}
 	severity := getStringParam(params, "incident_severity")
 	if severity == "" {
 		return "", fmt.Errorf("incident_severity is required")
 	}
 
 	body := map[string]any{
-		"title":             title,
 		"incident_severity": severity,
 	}
 
+	setOptionalString(params, body, "title")
 	setOptionalString(params, body, "description")
 	if channelID, ok := getIntParam(params, "channel_id"); ok {
 		body["channel_id"] = channelID
@@ -479,15 +497,10 @@ func handleReopenIncidents(client any, params map[string]any) (string, error) {
 	if len(incidentIDs) == 0 {
 		return "", fmt.Errorf("incident_ids is required and must not be empty")
 	}
-	reason := getStringParam(params, "reason")
-	if reason == "" {
-		return "", fmt.Errorf("reason is required")
-	}
-
 	body := map[string]any{
 		"incident_ids": incidentIDs,
-		"reason":       reason,
 	}
+	setOptionalString(params, body, "reason")
 	return doAction(c, "/incident/reopen", body,
 		fmt.Sprintf("Successfully reopened %d incident(s)", len(incidentIDs)))
 }
@@ -528,15 +541,10 @@ func handleCommentIncidents(client any, params map[string]any) (string, error) {
 	if len(incidentIDs) == 0 {
 		return "", fmt.Errorf("incident_ids is required and must not be empty")
 	}
-	comment := getStringParam(params, "comment")
-	if comment == "" {
-		return "", fmt.Errorf("comment is required")
-	}
-
 	body := map[string]any{
 		"incident_ids": incidentIDs,
-		"comment":      comment,
 	}
+	setOptionalString(params, body, "comment")
 	return doAction(c, "/incident/comment", body,
 		fmt.Sprintf("Successfully commented on %d incident(s)", len(incidentIDs)))
 }
@@ -549,7 +557,7 @@ func handleListAlerts(client any, params map[string]any) (string, error) {
 		return "", err
 	}
 
-	startTime, endTime, err := resolveTimeParams(params)
+	startTime, endTime, err := resolveListTimeParams(params)
 	if err != nil {
 		return "", err
 	}
@@ -560,12 +568,10 @@ func handleListAlerts(client any, params map[string]any) (string, error) {
 	}
 
 	setOptionalString(params, body, "alert_severity")
-	setOptionalString(params, body, "title")
 	if isActive, ok := getBoolParam(params, "is_active"); ok {
 		body["is_active"] = isActive
 	}
 	setOptionalIntSlice(params, body, "channel_ids")
-	setOptionalMap(params, body, "labels")
 	buildPaginationParams(params, body)
 
 	result, err := c.DoRequest("/alert/list", body)
@@ -599,22 +605,6 @@ func handleGetAlert(client any, params map[string]any) (string, error) {
 		return "", err
 	}
 	return injectTimestampDisplayToJSON(result, c.Location), nil
-}
-
-func handleCloseAlerts(client any, params map[string]any) (string, error) {
-	c, err := getClient(client)
-	if err != nil {
-		return "", err
-	}
-
-	alertIDs := getStringSliceParam(params, "alert_ids")
-	if len(alertIDs) == 0 {
-		return "", fmt.Errorf("alert_ids is required and must not be empty")
-	}
-
-	body := map[string]any{"alert_ids": alertIDs}
-	return doAction(c, "/alert/close", body,
-		fmt.Sprintf("Successfully closed %d alert(s)", len(alertIDs)))
 }
 
 // ===== Channel Handlers =====
@@ -673,15 +663,9 @@ func handleListSchedules(client any, params map[string]any) (string, error) {
 		return "", err
 	}
 
-	teamIDs := getIntSliceParam(params, "team_ids")
-	if len(teamIDs) == 0 {
-		return "", fmt.Errorf("team_ids is required and must not be empty")
-	}
+	body := map[string]any{}
 
-	body := map[string]any{
-		"team_ids": teamIDs,
-	}
-
+	setOptionalIntSlice(params, body, "team_ids")
 	setOptionalString(params, body, "query")
 	buildPaginationParams(params, body)
 
@@ -877,10 +861,15 @@ func handleAssignIncident(client any, params map[string]any) (string, error) {
 		"type": assignType,
 	}
 
-	if personIDs := getIntSliceParam(params, "person_ids"); len(personIDs) > 0 {
+	personIDs := getIntSliceParam(params, "person_ids")
+	escalateRuleID := getStringParam(params, "escalate_rule_id")
+	if len(personIDs) == 0 && escalateRuleID == "" {
+		return "", fmt.Errorf("one of person_ids or escalate_rule_id is required")
+	}
+	if len(personIDs) > 0 {
 		assignedTo["person_ids"] = personIDs
 	}
-	if escalateRuleID, ok := getIntParam(params, "escalate_rule_id"); ok {
+	if escalateRuleID != "" {
 		assignedTo["escalate_rule_id"] = escalateRuleID
 	}
 
@@ -923,7 +912,9 @@ func handleQueryChanges(client any, params map[string]any) (string, error) {
 	setOptionalString(params, body, "query")
 	setOptionalIntSlice(params, body, "channel_ids")
 	setOptionalIntSlice(params, body, "integration_ids")
-	setOptionalString(params, body, "order_by")
+	if orderBy := getStringParam(params, "order_by"); orderBy != "" {
+		body["orderby"] = orderBy
+	}
 	if asc, ok := getBoolParam(params, "asc"); ok {
 		body["asc"] = asc
 	}
@@ -974,7 +965,7 @@ func handleAggregateIncidents(client any, params map[string]any) (string, error)
 		return "", err
 	}
 
-	startTime, endTime, err := resolveTimeParams(params)
+	startTime, endTime, err := resolveListTimeParams(params)
 	if err != nil {
 		return "", err
 	}
