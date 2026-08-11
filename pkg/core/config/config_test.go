@@ -154,3 +154,16 @@ func TestLoadConfig_DefaultTimezone(t *testing.T) {
 		t.Errorf("expected default_timezone %q, got %q", "Asia/Shanghai", cfg.DefaultTimezone)
 	}
 }
+
+func TestLoadConfig_InsecureSkipTLSVerify(t *testing.T) {
+	t.Setenv("FLASHDUTY_MCP_APP_KEY", "test-key")
+	t.Setenv("FLASHDUTY_MCP_INSECURE_SKIP_TLS_VERIFY", "true")
+
+	cfg, err := LoadConfig("")
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+	if !cfg.InsecureSkipTLSVerify {
+		t.Error("expected insecure_skip_tls_verify to be true")
+	}
+}

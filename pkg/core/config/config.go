@@ -29,7 +29,8 @@ type StaticConfig struct {
 	BaseURL string `mapstructure:"base_url"`
 
 	// Security configuration
-	ReadOnly bool `mapstructure:"read_only"`
+	ReadOnly              bool `mapstructure:"read_only"`
+	InsecureSkipTLSVerify bool `mapstructure:"insecure_skip_tls_verify"`
 
 	// Tool configuration
 	EnabledTools  []string `mapstructure:"enabled_tools"`
@@ -73,6 +74,7 @@ func LoadConfig(configPath string) (*StaticConfig, error) {
 	// Set defaults
 	v.SetDefault("base_url", DefaultBaseURL)
 	v.SetDefault("default_timezone", "Asia/Shanghai")
+	v.SetDefault("insecure_skip_tls_verify", false)
 
 	// Set configuration file if provided
 	if configPath != "" {

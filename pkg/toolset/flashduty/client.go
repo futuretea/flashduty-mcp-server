@@ -2,8 +2,10 @@ package flashduty
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -16,17 +18,34 @@ type Client struct {
 	Location   *time.Location
 }
 
+type clientOptions struct {
+	insecureSkipTLSVerify bool
+}
+
+// ClientOption customizes the FlashDuty API client.
+type ClientOption func(*clientOptions)
+
+// WithInsecureSkipTLSVerify configures whether the client skips API server TLS verification.
+func WithInsecureSkipTLSVerify(skip bool) ClientOption {
+	return func(options *clientOptions) {
+		options.insecureSkipTLSVerify = skip
+	}
+}
+
 // NewClient creates a new FlashDuty API client.
-func NewClient(baseURL, appKey, timezone string) *Client {
+func NewClient(baseURL, appKey, timezone string, opts ...ClientOption) *Client {
 	loc, err := time.LoadLocation(timezone)
 	if err != nil {
 		loc = time.UTC
 	}
-	c := httpclient.NewClient(
-		&httpclient.Config{
-			BaseURL: baseURL,
-			Timeout: 30 * time.Second,
-		},
+	options := clientOptions{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&options)
+		}
+	}
+
+	httpClientOptions := []httpclient.Option{
 		httpclient.WithMiddleware(func(req *http.Request) error {
 			// Add app_key as query parameter for authentication
 			q := req.URL.Query()
@@ -34,8 +53,38 @@ func NewClient(baseURL, appKey, timezone string) *Client {
 			req.URL.RawQuery = q.Encode()
 			return nil
 		}),
+	}
+	if options.insecureSkipTLSVerify {
+		httpClientOptions = append(httpClientOptions, httpclient.WithHTTPClient(newInsecureHTTPClient(30*time.Second)))
+	}
+	c := httpclient.NewClient(
+		&httpclient.Config{
+			BaseURL: baseURL,
+			Timeout: 30 * time.Second,
+		},
+		httpClientOptions...,
 	)
 	return &Client{httpClient: c, Location: loc}
+}
+
+func newInsecureHTTPClient(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			MaxIdleConnsPerHost:   100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			TLSClientConfig:       &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // Explicit opt-in for trusted internal endpoints.
+		},
+	}
 }
 
 // apiResponse represents the standard FlashDuty API response envelope.

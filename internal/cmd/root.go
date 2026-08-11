@@ -35,7 +35,8 @@ func bindFlags(cmd *cobra.Command) {
 		"app_key":  "app-key",
 		"base_url": "base-url",
 		// Security configuration
-		"read_only": "read-only",
+		"read_only":                "read-only",
+		"insecure_skip_tls_verify": "insecure-skip-tls-verify",
 		// Tool configuration
 		"enabled_tools":  "enabled-tools",
 		"disabled_tools": "disabled-tools",
@@ -88,6 +89,7 @@ on-call schedules through the FlashDuty API.`,
 
 	// Security configuration flags
 	cmd.Flags().Bool("read-only", false, "Run in read-only mode (disables write operations)")
+	cmd.Flags().Bool("insecure-skip-tls-verify", false, "Skip FlashDuty API TLS certificate verification")
 
 	// Tool configuration flags
 	cmd.Flags().StringSlice("enabled-tools", []string{}, "Comma-separated list of tools to enable")

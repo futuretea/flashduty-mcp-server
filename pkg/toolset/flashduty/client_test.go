@@ -2,8 +2,30 @@ package flashduty
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 )
+
+func TestClient_InsecureSkipTLSVerify(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"ok":true}}`))
+	}))
+	defer server.Close()
+
+	strictClient := NewClient(server.URL, "test-app-key", "UTC")
+	if _, err := strictClient.DoGet("/"); err == nil {
+		t.Fatal("expected strict client to reject the self-signed certificate")
+	} else if !strings.Contains(err.Error(), "certificate") && !strings.Contains(err.Error(), "tls") {
+		t.Fatalf("unexpected strict client error: %v", err)
+	}
+
+	insecureClient := NewClient(server.URL, "test-app-key", "UTC", WithInsecureSkipTLSVerify(true))
+	if _, err := insecureClient.DoGet("/"); err != nil {
+		t.Fatalf("expected insecure client to accept the self-signed certificate: %v", err)
+	}
+}
 
 func TestParseResponse_NullData_ReturnsOK(t *testing.T) {
 	got, err := parseResponse(&apiResponse{Data: json.RawMessage("null")})

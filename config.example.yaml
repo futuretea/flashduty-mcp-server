@@ -36,6 +36,8 @@ app_key: your-app-key-here
 
 # Security configuration
 read_only: false  # Set to true to disable write operations (create, ack, resolve, reopen, snooze, comment, close)
+# Only for trusted internal FlashDuty API endpoints with a private or self-signed CA.
+# insecure_skip_tls_verify: false
 
 # Tool enable/disable configuration
 enabled_tools: []  # Enable specific tools (empty means all enabled)

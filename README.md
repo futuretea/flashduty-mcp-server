@@ -99,6 +99,7 @@ npx @futuretea/flashduty-mcp-server@latest --help
 | `--app-key` | FlashDuty API app key (**required**) | |
 | `--base-url` | FlashDuty API base URL | `https://api.flashcat.cloud` |
 | `--read-only` | Disable write operations | `false` |
+| `--insecure-skip-tls-verify` | Skip FlashDuty API TLS certificate verification | `false` |
 | `--enabled-tools` | Specific tools to enable | |
 | `--disabled-tools` | Specific tools to disable | |
 
@@ -119,6 +120,9 @@ app_key: your-app-key-here
 
 read_only: false  # Set to true to disable write operations
 
+# Only for trusted internal FlashDuty API endpoints with a private or self-signed CA.
+# insecure_skip_tls_verify: false
+
 # enabled_tools: []
 # disabled_tools: []
 ```
@@ -132,7 +136,13 @@ FLASHDUTY_MCP_PORT=8080
 FLASHDUTY_MCP_APP_KEY=your-key
 FLASHDUTY_MCP_READ_ONLY=false
 FLASHDUTY_MCP_LOG_LEVEL=5
+FLASHDUTY_MCP_INSECURE_SKIP_TLS_VERIFY=false
 ```
+
+For trusted internal FlashDuty API endpoints with a private or self-signed CA, set
+`FLASHDUTY_MCP_INSECURE_SKIP_TLS_VERIFY=true` or pass
+`--insecure-skip-tls-verify`. Keep this disabled for public endpoints. Prefer
+installing the private CA in the runtime trust store when possible.
 
 ### HTTP/SSE Mode
 
