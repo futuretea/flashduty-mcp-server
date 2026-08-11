@@ -27,7 +27,8 @@ RUN CGO_ENABLED=0 go build \
 FROM cgr.dev/chainguard/wolfi-base:latest AS runtime
 
 # Create non-root user
-RUN adduser -D -s /bin/sh flashduty
+RUN apk add --no-cache tzdata && \
+    adduser -D -s /bin/sh flashduty
 
 USER flashduty
 
